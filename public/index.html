@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GT App - Central de Pendências</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="app-container">
+        <!-- Top Header / Date Area -->
+        <header class="main-header glass-panel">
+            <div class="header-logo">
+                <span class="logo-badge">GT</span>
+                <h1>GT App</h1>
+            </div>
+            
+            <!-- Date Display (In Foreground) -->
+            <div class="date-hero">
+                <div class="date-day-name" id="current-day-name">Carregando...</div>
+                <div class="date-full" id="current-date-full">--/--/----</div>
+            </div>
+            
+            <div class="header-actions">
+                <button id="btn-mobile-link" class="btn btn-secondary mobile-access-btn" title="Acessar no celular">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Celular</span>
+                    <div class="mobile-popover glass-panel hidden" id="mobile-popover">
+                        <h4>Acessar no Smartphone</h4>
+                        <p>Escaneie o QR Code ou digite a URL (conecte no mesmo Wi-Fi):</p>
+                        <div class="qr-container" id="qr-container"></div>
+                        <input type="text" id="mobile-url-input" readonly value="Carregando..." onclick="this.select()">
+                    </div>
+                </button>
+                <button id="btn-open-register-user" class="btn btn-primary" title="Cadastrar novo usuário">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Cadastrar Usuário</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="toast hidden">
+            <span id="toast-message">Mensagem</span>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <section class="controls-panel glass-panel">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="search-input" placeholder="Pesquisar pendências...">
+            </div>
+            <div class="status-filters">
+                <button class="filter-btn active" data-filter="all">Todas</button>
+                <button class="filter-btn" data-filter="pending">Pendentes</button>
+                <button class="filter-btn" data-filter="completed">Concluídas</button>
+            </div>
+            <div class="sort-box">
+                <i class="fa-solid fa-arrow-down-wide-short sort-icon"></i>
+                <select id="sort-select" title="Ordenação das tarefas">
+                    <option value="default">Ordem Padrão</option>
+                    <option value="classification">Classificação (Urgente → Mensal)</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Main Workspace (Dynamic Grid for Registered Users) -->
+        <main class="lists-grid" id="users-columns-grid">
+            <div class="loader-inner" style="grid-column: 1 / -1;">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <span style="margin-left: 10px;">Carregando painel...</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Register User -->
+    <div id="modal-register-user" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="user-modal-title"><i class="fa-solid fa-user-plus"></i> Cadastrar Novo Usuário</h3>
+                <button class="btn-close-modal" onclick="closeModal('modal-register-user')">&times;</button>
+            </div>
+            <form id="form-register-user" class="modal-form">
+                <div class="form-group">
+                    <label for="reg-name">Nome</label>
+                    <input type="text" id="reg-name" placeholder="Ex: Lucas" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="reg-email">E-mail</label>
+                    <input type="email" id="reg-email" placeholder="Ex: lucas@confeccoesoneda.com.br" required autocomplete="off">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-user-modal" onclick="closeModal('modal-register-user')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary hidden" id="btn-cancel-edit-user" onclick="cancelEditUser()">Cancelar Edição</button>
+                    <button type="submit" class="btn btn-submit" id="btn-submit-user">Cadastrar</button>
+                </div>
+            </form>
+            
+            <div class="registered-users-section">
+                <h4>Usuários Cadastrados</h4>
+                <div class="users-mini-list" id="users-mini-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Task -->
+    <div id="modal-add-task" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-circle-plus"></i> Nova Pendência (<span id="add-task-owner-name">Usuário</span>)</h3>
+                <button class="btn-close-modal" onclick="closeModal('modal-add-task')">&times;</button>
+            </div>
+            <form id="form-add-task" class="modal-form">
+                <input type="hidden" id="add-task-owner-id">
+                <div class="form-group">
+                    <label for="task-text">Descrição da Pendência</label>
+                    <input type="text" id="task-text" placeholder="O que precisa ser feito?" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="task-obs">Observação / Comentário Inicial (Opcional)</label>
+                    <textarea id="task-obs" placeholder="Algum detalhe relevante..." rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="task-classification">Classificação</label>
+                    <select id="task-classification">
+                        <option value="">Nenhuma</option>
+                        <option value="urgente">Urgente (Vermelho)</option>
+                        <option value="semanal">Semanal (Amarelo)</option>
+                        <option value="mensal">Mensal (Azul)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-task')">Cancelar</button>
+                    <button type="submit" class="btn btn-submit">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

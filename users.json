@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Ketlyn",
+    "email": "ketlyn@confeccoesoneda.com.br",
+    "taskCol": "D",
+    "obsCol": "E",
+    "colIdx": 3
+  },
+  {
+    "name": "Ariel",
+    "email": "ariel@confeccoesoneda.com.br",
+    "taskCol": "F",
+    "obsCol": "G",
+    "colIdx": 5
+  },
+  {
+    "name": "Giovani",
+    "email": "giovani@confeccoesoneda.com.br",
+    "taskCol": "H",
+    "obsCol": "I",
+    "colIdx": 7
+  },
+  {
+    "name": "JOYCE",
+    "email": "giovani@confeccoesoneda",
+    "taskCol": "J",
+    "obsCol": "K",
+    "colIdx": 9
+  }
+]
