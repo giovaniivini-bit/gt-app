@@ -9,6 +9,7 @@ let searchQuery = '';
 let debounceTimers = {};
 let editingUser = null;
 let currentSort = 'default';
+let currentView = 'tasks';
 
 // On Load
 document.addEventListener('DOMContentLoaded', () => {
@@ -118,6 +119,16 @@ function setupEventListeners() {
     document.addEventListener('click', () => {
         if (mobilePopover) mobilePopover.classList.add('hidden');
     });
+
+    // View Tab buttons switching
+    const tabBtns = document.querySelectorAll('.view-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            switchView(btn.dataset.view);
+        });
+    });
 }
 
 // Fetch Users list
@@ -202,6 +213,7 @@ async function fetchTasks() {
         
         tasksData = await res.json();
         renderAllTasks();
+        renderDashboard();
     } catch (err) {
         console.error(err);
         showToast('Erro ao carregar tarefas: ' + err.message, true);
@@ -718,9 +730,228 @@ function initPolling() {
             if (res.ok) {
                 tasksData = await res.json();
                 renderAllTasks();
+                renderDashboard();
             }
         } catch (err) {
             console.error('Erro no polling:', err);
         }
     }, 10000);
+}
+
+// Switch between dashboard and tasks board views
+function switchView(viewName) {
+    currentView = viewName;
+    const tasksView = document.getElementById('tasks-view');
+    const dashboardView = document.getElementById('dashboard-view');
+    
+    if (viewName === 'tasks') {
+        tasksView.classList.remove('hidden');
+        dashboardView.classList.add('hidden');
+        renderAllTasks();
+    } else {
+        tasksView.classList.add('hidden');
+        dashboardView.classList.remove('hidden');
+        renderDashboard();
+    }
+}
+
+// Render dynamic dashboard overview
+function renderDashboard() {
+    const statsSummary = document.getElementById('dashboard-stats-summary');
+    const usersGrid = document.getElementById('dashboard-users-grid');
+    if (!statsSummary || !usersGrid) return;
+
+    // Calculate metrics
+    let totalPending = 0;
+    let totalUrgent = 0;
+    let userStats = [];
+
+    users.forEach(u => {
+        const lowerName = u.name.toLowerCase();
+        const userList = tasksData[lowerName] || [];
+        
+        // Count open tasks (item.completed === false)
+        const openTasks = userList.filter(t => !t.completed);
+        const count = openTasks.length;
+        totalPending += count;
+
+        let urgentCount = 0;
+        let weeklyCount = 0;
+        let monthlyCount = 0;
+        let noneCount = 0;
+
+        openTasks.forEach(t => {
+            if (t.classification === 'urgente') urgentCount++;
+            else if (t.classification === 'semanal') weeklyCount++;
+            else if (t.classification === 'mensal') monthlyCount++;
+            else noneCount++;
+        });
+
+        totalUrgent += urgentCount;
+
+        userStats.push({
+            user: u,
+            count,
+            urgentCount,
+            weeklyCount,
+            monthlyCount,
+            noneCount
+        });
+    });
+
+    // Find user with most pending tasks
+    let mostLoadedUser = 'Nenhum';
+    let maxPending = -1;
+    userStats.forEach(stat => {
+        if (stat.count > maxPending && stat.count > 0) {
+            maxPending = stat.count;
+            mostLoadedUser = `${stat.user.name} (${stat.count})`;
+        }
+    });
+    if (maxPending === -1) {
+        mostLoadedUser = 'Nenhum';
+    }
+
+    // Render global stats cards
+    statsSummary.innerHTML = `
+        <div class="stat-card glass-panel">
+            <div class="stat-card-icon total-pending">
+                <i class="fa-solid fa-list-check"></i>
+            </div>
+            <div class="stat-card-info">
+                <span class="stat-card-label">Total Pendentes</span>
+                <span class="stat-card-value">${totalPending}</span>
+            </div>
+        </div>
+        <div class="stat-card glass-panel">
+            <div class="stat-card-icon total-urgent">
+                <i class="fa-solid fa-fire-flame-curved"></i>
+            </div>
+            <div class="stat-card-info">
+                <span class="stat-card-label">Itens Urgentes</span>
+                <span class="stat-card-value">${totalUrgent}</span>
+            </div>
+        </div>
+        <div class="stat-card glass-panel">
+            <div class="stat-card-icon most-loaded">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="stat-card-info">
+                <span class="stat-card-label">Mais Carregado</span>
+                <span class="stat-card-value" style="font-size: 1.1rem; font-weight: 600;">${mostLoadedUser}</span>
+            </div>
+        </div>
+    `;
+
+    // Render user grid cards
+    usersGrid.innerHTML = '';
+    if (userStats.length === 0) {
+        usersGrid.innerHTML = `<div class="loader-inner" style="grid-column: 1 / -1; color: var(--text-muted);">Nenhum usuário para resumir.</div>`;
+        return;
+    }
+
+    userStats.forEach(stat => {
+        const lowerName = stat.user.name.toLowerCase();
+        
+        // Progress segments percentages
+        const total = stat.count || 1; // avoid division by zero
+        const urgentPct = stat.count ? (stat.urgentCount / total) * 100 : 0;
+        const weeklyPct = stat.count ? (stat.weeklyCount / total) * 100 : 0;
+        const monthlyPct = stat.count ? (stat.monthlyCount / total) * 100 : 0;
+        const nonePct = stat.count ? (stat.noneCount / total) * 100 : 0;
+
+        const card = document.createElement('div');
+        card.className = 'user-summary-card glass-panel';
+        
+        if (lowerName === 'ketlyn' || lowerName === 'ariel') {
+            card.setAttribute('data-user', lowerName);
+        } else {
+            card.setAttribute('data-user-dynamic', 'true');
+        }
+
+        // Set click behavior to jump to the user's column
+        card.addEventListener('click', () => {
+            // 1. Switch back to tasks view
+            document.querySelectorAll('.view-tab-btn').forEach(btn => {
+                if (btn.dataset.view === 'tasks') btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            switchView('tasks');
+            
+            // 2. Expand column
+            collapsedColumns[lowerName] = false;
+            const col = document.getElementById(`column-${lowerName}`);
+            const container = document.getElementById(`container-${lowerName}`);
+            if (col && container) {
+                col.classList.remove('collapsed');
+                container.classList.remove('collapsed');
+                
+                // 3. Scroll to it
+                col.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add a brief glow animation effect
+                col.classList.add('glow-highlight');
+                setTimeout(() => col.classList.remove('glow-highlight'), 2000);
+            }
+        });
+
+        card.innerHTML = `
+            <div class="user-card-header">
+                <div class="user-card-avatar">
+                    <i class="fa-solid fa-circle-user"></i>
+                </div>
+                <div class="user-card-meta">
+                    <span class="user-card-name">${stat.user.name}</span>
+                    <span class="user-card-email">${stat.user.email || 'Sem e-mail'}</span>
+                </div>
+            </div>
+            
+            <div class="user-card-counter">
+                <span class="user-card-counter-num">${stat.count}</span>
+                <span class="user-card-counter-label">pendências em aberto</span>
+            </div>
+
+            <div class="user-card-progress-container">
+                <div class="user-card-progress-bar">
+                    <div class="progress-segment urgent" style="width: ${urgentPct}%" title="Urgente: ${stat.urgentCount}"></div>
+                    <div class="progress-segment weekly" style="width: ${weeklyPct}%" title="Semanal: ${stat.weeklyCount}"></div>
+                    <div class="progress-segment monthly" style="width: ${monthlyPct}%" title="Mensal: ${stat.monthlyCount}"></div>
+                    <div class="progress-segment none" style="width: ${nonePct}%" title="Sem Prioridade: ${stat.noneCount}"></div>
+                </div>
+            </div>
+
+            <div class="user-card-breakdown">
+                <div class="breakdown-item">
+                    <div class="breakdown-label">
+                        <span class="breakdown-dot urgent"></span>
+                        <span>Urgentes</span>
+                    </div>
+                    <span class="breakdown-count">${stat.urgentCount}</span>
+                </div>
+                <div class="breakdown-item">
+                    <div class="breakdown-label">
+                        <span class="breakdown-dot weekly"></span>
+                        <span>Semanais</span>
+                    </div>
+                    <span class="breakdown-count">${stat.weeklyCount}</span>
+                </div>
+                <div class="breakdown-item">
+                    <div class="breakdown-label">
+                        <span class="breakdown-dot monthly"></span>
+                        <span>Mensais</span>
+                    </div>
+                    <span class="breakdown-count">${stat.monthlyCount}</span>
+                </div>
+                <div class="breakdown-item">
+                    <div class="breakdown-label">
+                        <span class="breakdown-dot none"></span>
+                        <span>Comuns</span>
+                    </div>
+                    <span class="breakdown-count">${stat.noneCount}</span>
+                </div>
+            </div>
+        `;
+
+        usersGrid.appendChild(card);
+    });
 }

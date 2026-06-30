@@ -52,33 +52,61 @@
             <span id="toast-message">Mensagem</span>
         </div>
 
-        <!-- Filter & Search Controls -->
-        <section class="controls-panel glass-panel">
-            <div class="search-box">
-                <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                <input type="text" id="search-input" placeholder="Pesquisar pendências...">
-            </div>
-            <div class="status-filters">
-                <button class="filter-btn active" data-filter="all">Todas</button>
-                <button class="filter-btn" data-filter="pending">Pendentes</button>
-                <button class="filter-btn" data-filter="completed">Concluídas</button>
-            </div>
-            <div class="sort-box">
-                <i class="fa-solid fa-arrow-down-wide-short sort-icon"></i>
-                <select id="sort-select" title="Ordenação das tarefas">
-                    <option value="default">Ordem Padrão</option>
-                    <option value="classification">Classificação (Urgente → Mensal)</option>
-                </select>
-            </div>
-        </section>
+        <!-- View Selection Tabs -->
+        <div class="view-selector">
+            <button class="view-tab-btn active" data-view="tasks">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Pendências</span>
+            </button>
+            <button class="view-tab-btn" data-view="dashboard">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </button>
+        </div>
 
-        <!-- Main Workspace (Dynamic Grid for Registered Users) -->
-        <main class="lists-grid" id="users-columns-grid">
-            <div class="loader-inner" style="grid-column: 1 / -1;">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
-                <span style="margin-left: 10px;">Carregando painel...</span>
+        <!-- View: Tasks Board -->
+        <div id="tasks-view">
+            <!-- Filter & Search Controls -->
+            <section class="controls-panel glass-panel">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Pesquisar pendências...">
+                </div>
+                <div class="status-filters">
+                    <button class="filter-btn active" data-filter="all">Todas</button>
+                    <button class="filter-btn" data-filter="pending">Pendentes</button>
+                    <button class="filter-btn" data-filter="completed">Concluídas</button>
+                </div>
+                <div class="sort-box">
+                    <i class="fa-solid fa-arrow-down-wide-short sort-icon"></i>
+                    <select id="sort-select" title="Ordenação das tarefas">
+                        <option value="default">Ordem Padrão</option>
+                        <option value="classification">Classificação (Urgente → Mensal)</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Main Workspace (Dynamic Grid for Registered Users) -->
+            <main class="lists-grid" id="users-columns-grid">
+                <div class="loader-inner" style="grid-column: 1 / -1;">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span style="margin-left: 10px;">Carregando painel...</span>
+                </div>
+            </main>
+        </div>
+
+        <!-- View: Dashboard -->
+        <div id="dashboard-view" class="dashboard-view hidden">
+            <!-- Global Stats Summary -->
+            <div class="dashboard-stats-summary" id="dashboard-stats-summary">
+                <!-- Dynamically loaded -->
             </div>
-        </main>
+            
+            <!-- Users Summary Grid -->
+            <div class="dashboard-users-grid" id="dashboard-users-grid">
+                <!-- Dynamically loaded -->
+            </div>
+        </div>
     </div>
 
     <!-- Modal: Register User -->
