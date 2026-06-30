@@ -190,6 +190,9 @@ function renderColumnsSkeleton() {
                     <h2>${u.name}</h2>
                 </div>
                 <div class="column-header-actions">
+                    <button class="btn-email-column" onclick="sendEmailReport('${u.name}')" title="Enviar lista de tarefas por e-mail para ${u.name}">
+                        <i class="fa-solid fa-envelope"></i>
+                    </button>
                     <button class="btn-add-task-inline" onclick="openAddTaskModal('${lowerName}', '${u.name}')" title="Adicionar pendência para ${u.name}">
                         <i class="fa-solid fa-plus"></i>
                     </button>
@@ -954,4 +957,45 @@ function renderDashboard() {
 
         usersGrid.appendChild(card);
     });
+}
+
+// Send active tasks report via mailto client
+function sendEmailReport(userName) {
+    const lowerName = userName.toLowerCase();
+    const user = users.find(u => u.name.toLowerCase() === lowerName);
+    if (!user) return;
+
+    const userList = tasksData[lowerName] || [];
+    const openTasks = userList.filter(t => !t.completed);
+
+    if (openTasks.length === 0) {
+        showToast(`Nenhuma pendência ativa para ${user.name}!`);
+        return;
+    }
+
+    const email = user.email || '';
+    const cc = 'giovani@confeccoesoneda.com.br';
+    const subject = `📊 Suas Pendências do GT App - ${new Date().toLocaleDateString('pt-BR')}`;
+    
+    let body = `Olá ${user.name},\n\n`;
+    body += `Aqui está a lista de suas pendências em aberto no GT App:\n\n`;
+    
+    openTasks.forEach(t => {
+        let prefix = '• ';
+        if (t.classification === 'urgente') prefix = '• [URGENTE] ';
+        else if (t.classification === 'semanal') prefix = '• [SEMANAL] ';
+        else if (t.classification === 'mensal') prefix = '• [MENSAL] ';
+        
+        body += `${prefix}${t.task}\n`;
+        if (t.observation) {
+            body += `  (Obs: ${t.observation})\n`;
+        }
+    });
+    
+    body += `\nPara atualizar o status ou adicionar observações, acesse:\n`;
+    body += `https://tasks.136-248-111-213.sslip.io\n`;
+
+    const mailtoUrl = `mailto:${encodeURIComponent(email)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    window.location.href = mailtoUrl;
 }
