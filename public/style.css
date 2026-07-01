@@ -264,17 +264,19 @@ body {
     border-color: rgba(var(--color-primary-rgb), 0.2);
 }
 
-/* Two/Multi columns list grid container - responsive auto-fit */
+/* Dynamic Column Grid using Flexbox for Accordion Focus Effect */
 .lists-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    display: flex;
     gap: 24px;
     align-items: start;
+    width: 100%;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .lists-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
     }
 }
 
@@ -285,7 +287,22 @@ body {
     padding: 20px;
     min-height: auto;
     border-top: 4px solid var(--border-color);
-    transition: all 0.3s ease;
+    background: rgba(16, 20, 38, 0.4);
+    border-radius: 20px;
+    
+    /* Expanded Column Sizing */
+    flex: 1 1 450px;
+    min-width: 350px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed Column Sizing - accordion behavior */
+.list-column.collapsed {
+    flex: 0 0 80px;
+    min-width: 80px;
+    max-width: 80px;
+    padding: 20px 8px;
+    overflow: hidden;
 }
 
 /* Specific colors/borders for columns */
@@ -1537,5 +1554,121 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* Collapsed Column inner layout adjustments */
+.list-column.collapsed .column-header {
+    flex-direction: column;
+    gap: 20px;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.list-column.collapsed .column-header-clickable {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+}
+
+.list-column.collapsed .column-header-clickable h2 {
+    display: none; /* Hide user name when collapsed */
+}
+
+.list-column.collapsed .column-header-clickable .toggle-arrow {
+    font-size: 0.9rem;
+}
+
+.list-column.collapsed .column-header-actions {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: center;
+}
+
+.list-column.collapsed .column-header-actions .btn-email-column,
+.list-column.collapsed .column-header-actions .btn-add-task-inline {
+    display: none; /* Hide header buttons when collapsed */
+}
+
+.list-column.collapsed .column-header-actions .badge {
+    margin: 0;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 992px) {
+    .list-column.collapsed {
+        flex: 0 0 auto;
+        min-width: 100%;
+        max-width: 100%;
+        padding: 16px 20px;
+    }
+    .list-column.collapsed .column-header {
+        flex-direction: row;
+        gap: 10px;
+    }
+    .list-column.collapsed .column-header-clickable {
+        flex-direction: row;
+        align-items: center;
+    }
+    .list-column.collapsed .column-header-clickable h2 {
+        display: block; /* Show name on mobile since it stacks vertically */
+    }
+    .list-column.collapsed .column-header-actions {
+        flex-direction: row;
+    }
+    .list-column.collapsed .column-header-actions .btn-email-column,
+    .list-column.collapsed .column-header-actions .btn-add-task-inline {
+        display: block; /* Restore header buttons on mobile collapsed list */
+    }
+}
+
+/* Card layout adjustments (Actions Top-Right, Text Bottom) */
+.card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 8px;
+    gap: 12px;
+}
+
+.card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drag-handle {
+    color: var(--text-muted);
+    cursor: grab;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    transition: color var(--transition-speed) ease;
+}
+
+.drag-handle:hover {
+    color: var(--text-main);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.card-body-row {
+    width: 100%;
+    padding-left: 28px; /* aligns text nicely past drag handle & checkbox */
+}
+
+/* Make card display flex-column-like for stack */
+.task-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
 }
 

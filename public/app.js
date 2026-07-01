@@ -308,33 +308,23 @@ function renderColumnTasks(lowerName, list) {
             : '';
         
         const cardContent = `
-            <div class="card-top">
-                <label class="checkbox-container">
-                    <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleTask('${lowerName}', ${item.row}, this.checked)">
-                    <span class="checkmark"></span>
-                </label>
-                <div class="task-content">
-                    <div class="task-text-view" id="text-view-${lowerName}-${item.row}">
-                        <div class="task-text">${classificationBadge}${item.task}</div>
+            <div class="card-header-row">
+                <div class="card-header-left">
+                    <div class="drag-handle" title="Arrastar para reordenar">
+                        <i class="fa-solid fa-grip-vertical"></i>
                     </div>
-                    <div class="task-text-edit hidden" id="text-edit-${lowerName}-${item.row}">
-                        <textarea class="task-edit-input" id="input-${lowerName}-${item.row}">${item.task}</textarea>
-                    </div>
+                    <label class="checkbox-container">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleTask('${lowerName}', ${item.row}, this.checked)">
+                        <span class="checkmark"></span>
+                    </label>
                 </div>
+                
                 <div class="card-actions" id="actions-${lowerName}-${item.row}">
                     <div class="classification-dots">
                         <button class="dot-btn urgent ${item.classification === 'urgente' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'urgente')" title="Urgente"></button>
                         <button class="dot-btn weekly ${item.classification === 'semanal' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'semanal')" title="Semanal"></button>
                         <button class="dot-btn monthly ${item.classification === 'mensal' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'mensal')" title="Mensal"></button>
                         <button class="dot-btn none ${!item.classification ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'none')" title="Limpar Classificação"></button>
-                    </div>
-                    <div class="move-btns">
-                        <button class="btn-move btn-move-up" onclick="moveTaskUpDown('${lowerName}', ${item.row}, 'up')" title="Mover para cima">
-                            <i class="fa-solid fa-chevron-up"></i>
-                        </button>
-                        <button class="btn-move btn-move-down" onclick="moveTaskUpDown('${lowerName}', ${item.row}, 'down')" title="Mover para baixo">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
                     </div>
                     <button class="btn-card-action btn-edit-task" onclick="startEditTask('${lowerName}', ${item.row})" title="Editar descrição">
                         <i class="fa-solid fa-pen"></i>
@@ -346,6 +336,7 @@ function renderColumnTasks(lowerName, list) {
                         <i class="${hasComment ? 'fa-solid fa-comment' : 'fa-regular fa-comment'}"></i>
                     </button>
                 </div>
+                
                 <div class="card-edit-actions hidden" id="edit-actions-${lowerName}-${item.row}">
                     <button class="btn-card-action btn-save-edit" onclick="saveEditTask('${lowerName}', ${item.row})" title="Salvar">
                         <i class="fa-solid fa-check"></i>
@@ -353,6 +344,17 @@ function renderColumnTasks(lowerName, list) {
                     <button class="btn-card-action btn-cancel-edit" onclick="cancelEditTask('${lowerName}', ${item.row})" title="Cancelar">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                </div>
+            </div>
+            
+            <div class="card-body-row">
+                <div class="task-content">
+                    <div class="task-text-view" id="text-view-${lowerName}-${item.row}">
+                        <div class="task-text">${classificationBadge}${item.task}</div>
+                    </div>
+                    <div class="task-text-edit hidden" id="text-edit-${lowerName}-${item.row}">
+                        <textarea class="task-edit-input" id="input-${lowerName}-${item.row}">${item.task}</textarea>
+                    </div>
                 </div>
             </div>
             
@@ -368,6 +370,15 @@ function renderColumnTasks(lowerName, list) {
         `;
         
         card.innerHTML = cardContent;
+        
+        // Touch dragging support for mobile
+        const handle = card.querySelector('.drag-handle');
+        if (handle) {
+            handle.addEventListener('touchstart', handleTouchStart, { passive: false });
+            handle.addEventListener('touchmove', handleTouchMove, { passive: false });
+            handle.addEventListener('touchend', handleTouchEnd);
+        }
+        
         container.appendChild(card);
     });
 }
@@ -1204,4 +1215,63 @@ async function saveNewTasksOrder(person, newRowsOrder) {
         showToast(err.message, true);
         await fetchTasks(); // Rollback on error
     }
+}
+
+// Touch dragging support for mobile (Google Tasks style)
+let touchStartY = 0;
+let touchActiveCard = null;
+let touchActivePerson = null;
+
+function handleTouchStart(e) {
+    const handle = e.currentTarget;
+    const card = handle.closest('.task-card');
+    if (!card) return;
+    
+    touchActiveCard = card;
+    touchActivePerson = card.dataset.person;
+    touchStartY = e.touches[0].clientY;
+    card.classList.add('dragging');
+}
+
+function handleTouchMove(e) {
+    if (!touchActiveCard) return;
+    // Prevent default scrolling when dragging
+    if (e.cancelable) e.preventDefault();
+}
+
+async function handleTouchEnd(e) {
+    if (!touchActiveCard) return;
+    touchActiveCard.classList.remove('dragging');
+    
+    const touchY = e.changedTouches[0].clientY;
+    const touchX = e.changedTouches[0].clientX;
+    
+    // Find element under touch point
+    const element = document.elementFromPoint(touchX, touchY);
+    const targetCard = element ? element.closest('.task-card') : null;
+    
+    if (targetCard && targetCard !== touchActiveCard && targetCard.dataset.person === touchActivePerson) {
+        const destPerson = touchActivePerson;
+        const srcRow = Number(touchActiveCard.dataset.row);
+        const destRow = Number(targetCard.dataset.row);
+        
+        const list = tasksData[destPerson];
+        const fromIndex = list.findIndex(t => t.row === srcRow);
+        const toIndex = list.findIndex(t => t.row === destRow);
+        
+        if (fromIndex !== -1 && toIndex !== -1) {
+            const [movedTask] = list.splice(fromIndex, 1);
+            list.splice(toIndex, 0, movedTask);
+            
+            // Optimistically re-render
+            renderColumnTasks(destPerson, list);
+            
+            // Save new order to Sheets
+            const newRowsOrder = list.map(t => t.row);
+            await saveNewTasksOrder(destPerson, newRowsOrder);
+        }
+    }
+    
+    touchActiveCard = null;
+    touchActivePerson = null;
 }
