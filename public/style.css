@@ -298,9 +298,9 @@ body {
 
 /* Collapsed Column Sizing - accordion behavior */
 .list-column.collapsed {
-    flex: 0 0 80px;
-    min-width: 80px;
-    max-width: 80px;
+    flex: 0 0 100px;
+    min-width: 100px;
+    max-width: 100px;
     padding: 20px 8px;
     overflow: hidden;
 }
@@ -1573,14 +1573,17 @@ body {
 
 .list-column.collapsed .column-header-clickable h2 {
     display: block;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
+    writing-mode: horizontal-tb;
+    transform: none;
     white-space: nowrap;
-    margin: 8px 0;
-    font-size: 1.1rem;
+    margin: 4px 0 0 0;
+    font-size: 0.9rem;
     font-weight: 600;
+    text-align: center;
     color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .list-column.collapsed .column-header-clickable .toggle-arrow {
