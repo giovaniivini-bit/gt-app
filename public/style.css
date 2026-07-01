@@ -264,10 +264,10 @@ body {
     border-color: rgba(var(--color-primary-rgb), 0.2);
 }
 
-/* Two/Multi columns list grid container - responsive auto-fit */
+/* Dynamic flex grid container with wrap support */
 .lists-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 24px;
     align-items: start;
     width: 100%;
@@ -282,7 +282,24 @@ body {
     border-top: 4px solid var(--border-color);
     background: rgba(16, 20, 38, 0.4);
     border-radius: 20px;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Default flex settings for collapsed/standard columns */
+    flex: 1 1 320px;
+    min-width: 300px;
+    
+    /* Smooth transitions for horizontal and vertical desdobramento */
+    transition: flex 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                min-width 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                background-color 0.3s ease, 
+                border-color 0.3s ease;
+}
+
+/* Active expanded column takes protagonism (60% width) */
+.list-column:not(.collapsed) {
+    flex: 3 1 60%;
+    min-width: 60%;
+    background: rgba(16, 20, 38, 0.65);
+    border-color: rgba(var(--color-primary-rgb), 0.25);
 }
 
 /* Specific colors/borders for columns */
