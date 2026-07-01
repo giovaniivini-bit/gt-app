@@ -1572,7 +1572,15 @@ body {
 }
 
 .list-column.collapsed .column-header-clickable h2 {
-    display: none; /* Hide user name when collapsed */
+    display: block;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    margin: 8px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-muted);
 }
 
 .list-column.collapsed .column-header-clickable .toggle-arrow {
@@ -1613,7 +1621,10 @@ body {
         align-items: center;
     }
     .list-column.collapsed .column-header-clickable h2 {
-        display: block; /* Show name on mobile since it stacks vertically */
+        display: block;
+        writing-mode: horizontal-tb;
+        transform: none;
+        margin: 0;
     }
     .list-column.collapsed .column-header-actions {
         flex-direction: row;
