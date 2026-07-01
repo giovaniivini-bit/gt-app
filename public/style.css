@@ -1414,3 +1414,128 @@ body {
     }
 }
 
+/* Task card drag and drop styling */
+.task-card.dragging {
+    opacity: 0.4;
+    border: 2px dashed rgba(var(--color-primary-rgb), 0.5);
+    background: rgba(16, 20, 38, 0.1);
+}
+
+/* Card actions button styling */
+.btn-card-action {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    transition: all var(--transition-speed) ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.btn-card-action:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-edit-task:hover {
+    color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb), 0.1);
+}
+
+.btn-delete-task:hover {
+    color: #ff5252;
+    background: rgba(244, 67, 54, 0.1);
+}
+
+.btn-save-edit {
+    color: #4caf50;
+}
+
+.btn-save-edit:hover {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.btn-cancel-edit {
+    color: #f44336;
+}
+
+.btn-cancel-edit:hover {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+/* Up/Down buttons styling */
+.move-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.btn-move {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all var(--transition-speed) ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.btn-move:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-move-up:hover {
+    color: var(--color-primary);
+}
+
+.btn-move-down:hover {
+    color: var(--color-primary);
+}
+
+/* Text inline edit styling */
+.task-text-view {
+    display: flex;
+    align-items: center;
+}
+
+.task-text-edit {
+    width: 100%;
+}
+
+.task-edit-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-family: var(--font-inter);
+    resize: vertical;
+    min-height: 50px;
+    outline: none;
+}
+
+.task-edit-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 10px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.card-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+

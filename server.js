@@ -205,7 +205,7 @@ app.get('/api/tasks', async (req, res) => {
     const tasksResponse = await sheets.spreadsheets.get({
       spreadsheetId: TASKS_SPREADSHEET_ID,
       ranges: [`'APP '!D1:${maxColLetter}150`],
-      fields: "sheets(data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat))))"
+      fields: "sheets(properties(sheetId),data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat,userEnteredFormat))))"
     });
 
     const sheetData = tasksResponse.data.sheets[0].data[0];
@@ -436,6 +436,207 @@ app.post('/api/tasks/classify', async (req, res) => {
   } catch (error) {
     console.error('Erro ao classificar tarefa:', error);
     res.status(500).json({ error: 'Erro ao classificar no Sheets: ' + error.message });
+  }
+});
+
+// Edit Task description (overwrites task text while preserving classification prefix)
+app.post('/api/tasks/edit', async (req, res) => {
+  const { row, person, task } = req.body;
+  if (!row || !person || task === undefined) {
+    return res.status(400).json({ error: 'Linha, responsável e novo texto são obrigatórios.' });
+  }
+
+  try {
+    const users = loadUsers();
+    const user = users.find(u => u.name.toLowerCase() === person.toLowerCase());
+    if (!user) {
+      return res.status(400).json({ error: `Usuário '${person}' não encontrado.` });
+    }
+
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    // Fetch the current task cell from the sheet first to see if it had a prefix
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      range: `'APP '!${user.taskCol}${row}`
+    });
+
+    const cellValues = response.data.values;
+    let currentText = '';
+    if (cellValues && cellValues.length > 0 && cellValues[0].length > 0) {
+      currentText = cellValues[0][0] || '';
+    }
+
+    // Check current prefix
+    let prefix = '';
+    const upperText = currentText.toUpperCase();
+    if (upperText.startsWith('[URGENTE]')) prefix = '[URGENTE] ';
+    else if (upperText.startsWith('[SEMANAL]')) prefix = '[SEMANAL] ';
+    else if (upperText.startsWith('[MENSAL]')) prefix = '[MENSAL] ';
+
+    // Prepend prefix to new task text if the new text is not a formula
+    let finalTaskText = task.trim();
+    if (prefix && !finalTaskText.startsWith('=')) {
+      finalTaskText = prefix + finalTaskText;
+    }
+
+    // Write back to sheet
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      range: `'APP '!${user.taskCol}${row}`,
+      valueInputOption: "RAW",
+      resource: {
+        values: [[finalTaskText]]
+      }
+    });
+
+    res.json({ success: true, message: 'Tarefa editada com sucesso.', taskText: finalTaskText });
+
+  } catch (error) {
+    console.error('Erro ao editar tarefa:', error);
+    res.status(500).json({ error: 'Erro ao editar no Sheets: ' + error.message });
+  }
+});
+
+// Update tasks order or delete task (unified endpoint using cells rearrangement in memory)
+app.post('/api/tasks/update-order', async (req, res) => {
+  const { person, newRowsOrder } = req.body;
+  if (!person || !newRowsOrder || !Array.isArray(newRowsOrder)) {
+    return res.status(400).json({ error: 'Responsável e nova ordem de linhas são obrigatórios.' });
+  }
+
+  try {
+    const users = loadUsers();
+    const user = users.find(u => u.name.toLowerCase() === person.toLowerCase());
+    if (!user) {
+      return res.status(400).json({ error: `Usuário '${person}' não encontrado.` });
+    }
+
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    // Fetch sheet rows from D1 to MaxColumn150 with full cell metadata
+    let maxColIdx = 3;
+    users.forEach(u => {
+      if (u.colIdx + 1 > maxColIdx) maxColIdx = u.colIdx + 1;
+    });
+    const maxColLetter = indexToColumnLetter(maxColIdx);
+
+    const tasksResponse = await sheets.spreadsheets.get({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      ranges: [`'APP '!D1:${maxColLetter}150`],
+      fields: "sheets(properties(sheetId),data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat,userEnteredFormat))))"
+    });
+
+    const sheet = tasksResponse.data.sheets[0];
+    const sheetId = sheet.properties.sheetId;
+    const rowData = sheet.data[0].rowData || [];
+
+    const relTaskIdx = user.colIdx - 3;
+    const relObsIdx = relTaskIdx + 1;
+
+    // Load current cells from row 4 (index 3) to 150
+    const userCells = [];
+    const maxRows = 150;
+    for (let r = 3; r < maxRows; r++) {
+      const row = rowData[r] || {};
+      const values = row.values || [];
+      const taskCell = values[relTaskIdx] || {};
+      const obsCell = values[relObsIdx] || {};
+      userCells.push({
+        row: r + 1,
+        taskCell: taskCell,
+        obsCell: obsCell
+      });
+    }
+
+    // Rearrange cells based on the new order of rows
+    const rearrangedCells = [];
+    newRowsOrder.forEach(rowNum => {
+      const cellObj = userCells.find(c => c.row === rowNum);
+      if (cellObj) {
+        rearrangedCells.push({
+          taskCell: cellObj.taskCell,
+          obsCell: cellObj.obsCell
+        });
+      }
+    });
+
+    // Pad with empty cells to keep the original length and clear subsequent rows
+    while (rearrangedCells.length < userCells.length) {
+      rearrangedCells.push({
+        taskCell: {},
+        obsCell: {}
+      });
+    }
+
+    // Build the row update requests for updateCells
+    const rows = [];
+    for (let i = 0; i < userCells.length; i++) {
+      const cellObj = rearrangedCells[i];
+      const taskData = {};
+      const obsData = {};
+
+      // Set userEnteredValue
+      if (cellObj.taskCell.userEnteredValue) {
+        taskData.userEnteredValue = cellObj.taskCell.userEnteredValue;
+      } else {
+        taskData.userEnteredValue = { stringValue: "" };
+      }
+
+      // Set userEnteredFormat
+      if (cellObj.taskCell.userEnteredFormat) {
+        taskData.userEnteredFormat = cellObj.taskCell.userEnteredFormat;
+      } else if (cellObj.taskCell.effectiveFormat) {
+        taskData.userEnteredFormat = cellObj.taskCell.effectiveFormat;
+      }
+
+      if (cellObj.obsCell.userEnteredValue) {
+        obsData.userEnteredValue = cellObj.obsCell.userEnteredValue;
+      } else {
+        obsData.userEnteredValue = { stringValue: "" };
+      }
+
+      if (cellObj.obsCell.userEnteredFormat) {
+        obsData.userEnteredFormat = cellObj.obsCell.userEnteredFormat;
+      } else if (cellObj.obsCell.effectiveFormat) {
+        obsData.userEnteredFormat = cellObj.obsCell.effectiveFormat;
+      }
+
+      rows.push({
+        values: [taskData, obsData]
+      });
+    }
+
+    // Update cells using batchUpdate
+    const updateRequest = {
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            updateCells: {
+              rows: rows,
+              fields: "userEnteredValue,userEnteredFormat",
+              range: {
+                sheetId: sheetId,
+                startRowIndex: 3,
+                endRowIndex: 3 + userCells.length,
+                startColumnIndex: user.colIdx,
+                endColumnIndex: user.colIdx + 2
+              }
+            }
+          }
+        ]
+      }
+    };
+
+    await sheets.spreadsheets.batchUpdate(updateRequest);
+    res.json({ success: true, message: 'Ordem e tarefas atualizadas com sucesso.' });
+
+  } catch (error) {
+    console.error('Erro ao atualizar ordem/tarefas:', error);
+    res.status(500).json({ error: 'Erro ao atualizar no Sheets: ' + error.message });
   }
 });
 

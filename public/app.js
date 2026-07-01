@@ -8,7 +8,6 @@ let currentFilter = 'all';
 let searchQuery = '';
 let debounceTimers = {};
 let editingUser = null;
-let currentSort = 'default';
 let currentView = 'tasks';
 
 // On Load
@@ -76,11 +75,7 @@ function setupEventListeners() {
     // Task Form Submit
     document.getElementById('form-add-task').addEventListener('submit', handleAddTask);
 
-    // Sorting
-    document.getElementById('sort-select').addEventListener('change', (e) => {
-        currentSort = e.target.value;
-        renderAllTasks();
-    });
+
 
     // Mobile Link Popover Toggle
     const mobileBtn = document.getElementById('btn-mobile-link');
@@ -276,17 +271,6 @@ function renderColumnTasks(lowerName, list) {
     if (!container || !countBadge) return;
 
     const filteredList = filterAndSearch(list);
-
-    // Apply Sorting
-    if (currentSort === 'classification') {
-        const weights = { 'urgente': 1, 'semanal': 2, 'mensal': 3, '': 4 };
-        filteredList.sort((a, b) => {
-            const wa = weights[a.classification || ''] || 4;
-            const wb = weights[b.classification || ''] || 4;
-            if (wa !== wb) return wa - wb;
-            return a.row - b.row;
-        });
-    }
     
     // Update Badge (show pending count)
     const pendingCount = list.filter(item => !item.completed).length;
@@ -303,6 +287,14 @@ function renderColumnTasks(lowerName, list) {
         const card = document.createElement('div');
         card.className = `task-card ${item.completed ? 'completed' : ''}`;
         card.dataset.row = item.row;
+        card.dataset.person = lowerName;
+        
+        // Native HTML5 Drag and Drop listeners
+        card.setAttribute('draggable', 'true');
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('drop', handleDrop);
         
         const hasComment = !!item.observation;
         
@@ -322,17 +314,44 @@ function renderColumnTasks(lowerName, list) {
                     <span class="checkmark"></span>
                 </label>
                 <div class="task-content">
-                    <div class="task-text">${classificationBadge}${item.task}</div>
+                    <div class="task-text-view" id="text-view-${lowerName}-${item.row}">
+                        <div class="task-text">${classificationBadge}${item.task}</div>
+                    </div>
+                    <div class="task-text-edit hidden" id="text-edit-${lowerName}-${item.row}">
+                        <textarea class="task-edit-input" id="input-${lowerName}-${item.row}">${item.task}</textarea>
+                    </div>
                 </div>
-                <div class="card-actions">
+                <div class="card-actions" id="actions-${lowerName}-${item.row}">
                     <div class="classification-dots">
                         <button class="dot-btn urgent ${item.classification === 'urgente' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'urgente')" title="Urgente"></button>
                         <button class="dot-btn weekly ${item.classification === 'semanal' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'semanal')" title="Semanal"></button>
                         <button class="dot-btn monthly ${item.classification === 'mensal' ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'mensal')" title="Mensal"></button>
                         <button class="dot-btn none ${!item.classification ? 'active' : ''}" onclick="changeClassification('${lowerName}', ${item.row}, 'none')" title="Limpar Classificação"></button>
                     </div>
+                    <div class="move-btns">
+                        <button class="btn-move btn-move-up" onclick="moveTaskUpDown('${lowerName}', ${item.row}, 'up')" title="Mover para cima">
+                            <i class="fa-solid fa-chevron-up"></i>
+                        </button>
+                        <button class="btn-move btn-move-down" onclick="moveTaskUpDown('${lowerName}', ${item.row}, 'down')" title="Mover para baixo">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <button class="btn-card-action btn-edit-task" onclick="startEditTask('${lowerName}', ${item.row})" title="Editar descrição">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="btn-card-action btn-delete-task" onclick="deleteTaskConfirm('${lowerName}', ${item.row})" title="Excluir pendência">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
                     <button id="${buttonId}" class="btn-comment ${hasComment ? 'has-comment' : ''}" onclick="toggleComment('${lowerName}', ${item.row})" title="Observações">
                         <i class="${hasComment ? 'fa-solid fa-comment' : 'fa-regular fa-comment'}"></i>
+                    </button>
+                </div>
+                <div class="card-edit-actions hidden" id="edit-actions-${lowerName}-${item.row}">
+                    <button class="btn-card-action btn-save-edit" onclick="saveEditTask('${lowerName}', ${item.row})" title="Salvar">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button class="btn-card-action btn-cancel-edit" onclick="cancelEditTask('${lowerName}', ${item.row})" title="Cancelar">
+                        <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
             </div>
@@ -998,4 +1017,191 @@ function sendEmailReport(userName) {
     const mailtoUrl = `mailto:${encodeURIComponent(email)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
     window.location.href = mailtoUrl;
+}
+
+// Task reordering state variables
+let dragSrcRow = null;
+let dragSrcPerson = null;
+
+// HTML5 Drag and Drop handlers
+function handleDragStart(e) {
+    e.stopPropagation();
+    const card = e.currentTarget;
+    card.classList.add('dragging');
+    dragSrcRow = Number(card.dataset.row);
+    dragSrcPerson = card.dataset.person;
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    e.stopPropagation();
+    e.currentTarget.classList.remove('dragging');
+    dragSrcRow = null;
+    dragSrcPerson = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetCard = e.currentTarget;
+    const destPerson = targetCard.dataset.person;
+    const destRow = Number(targetCard.dataset.row);
+
+    // Only allow drag and drop within the same user's column
+    if (dragSrcPerson !== destPerson || dragSrcRow === destRow) return;
+
+    const list = tasksData[destPerson];
+    const fromIndex = list.findIndex(t => t.row === dragSrcRow);
+    const toIndex = list.findIndex(t => t.row === destRow);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    // Move task in local list
+    const [movedTask] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, movedTask);
+
+    // Optimistically re-render this column
+    renderColumnTasks(destPerson, list);
+
+    // Save the new rows order to Sheets
+    const newRowsOrder = list.map(t => t.row);
+    await saveNewTasksOrder(destPerson, newRowsOrder);
+}
+
+// Move task Up or Down via button
+async function moveTaskUpDown(person, row, direction) {
+    const list = tasksData[person];
+    const idx = list.findIndex(t => t.row === row);
+    if (idx === -1) return;
+
+    let targetIdx = idx;
+    if (direction === 'up' && idx > 0) {
+        targetIdx = idx - 1;
+    } else if (direction === 'down' && idx < list.length - 1) {
+        targetIdx = idx + 1;
+    }
+
+    if (targetIdx === idx) return;
+
+    // Swap locally
+    const [movedTask] = list.splice(idx, 1);
+    list.splice(targetIdx, 0, movedTask);
+
+    // Optimistically re-render
+    renderColumnTasks(person, list);
+
+    // Save order
+    const newRowsOrder = list.map(t => t.row);
+    await saveNewTasksOrder(person, newRowsOrder);
+}
+
+// Delete task from app and Sheets (shifting values up)
+async function deleteTaskConfirm(person, row) {
+    if (!confirm('Deseja realmente excluir esta pendência? Ela será removida da planilha também.')) return;
+
+    const list = tasksData[person];
+    const newList = list.filter(t => t.row !== row);
+
+    // Optimistically re-render
+    renderColumnTasks(person, newList);
+
+    // Save order (which automatically handles deleting the omitted row!)
+    const newRowsOrder = newList.map(t => t.row);
+    await saveNewTasksOrder(person, newRowsOrder);
+}
+
+// Edit Task Inline
+function startEditTask(person, row) {
+    document.getElementById(`text-view-${person}-${row}`).classList.add('hidden');
+    document.getElementById(`actions-${person}-${row}`).classList.add('hidden');
+    
+    document.getElementById(`text-edit-${person}-${row}`).classList.remove('hidden');
+    document.getElementById(`edit-actions-${person}-${row}`).classList.remove('hidden');
+    
+    const input = document.getElementById(`input-${person}-${row}`);
+    input.focus();
+    // Put cursor at the end
+    const val = input.value;
+    input.value = '';
+    input.value = val;
+}
+
+// Cancel Inline Edit
+function cancelEditTask(person, row) {
+    const item = tasksData[person].find(t => t.row === row);
+    if (item) {
+        document.getElementById(`input-${person}-${row}`).value = item.task;
+    }
+    
+    document.getElementById(`text-view-${person}-${row}`).classList.remove('hidden');
+    document.getElementById(`actions-${person}-${row}`).classList.remove('hidden');
+    
+    document.getElementById(`text-edit-${person}-${row}`).classList.add('hidden');
+    document.getElementById(`edit-actions-${person}-${row}`).classList.add('hidden');
+}
+
+// Save Inline Edit
+async function saveEditTask(person, row) {
+    const input = document.getElementById(`input-${person}-${row}`);
+    const newText = input.value.trim();
+    if (!newText) {
+        showToast('A pendência não pode ficar vazia.', true);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/tasks/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                row,
+                person,
+                task: newText
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao editar tarefa.');
+
+        const item = tasksData[person].find(t => t.row === row);
+        if (item) {
+            item.task = newText;
+        }
+
+        renderColumnTasks(person, tasksData[person]);
+        showToast('Pendência atualizada!');
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, true);
+        cancelEditTask(person, row);
+    }
+}
+
+// Call backend to update the order of rows or delete
+async function saveNewTasksOrder(person, newRowsOrder) {
+    try {
+        const res = await fetch('/api/tasks/update-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                person,
+                newRowsOrder
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao reordenar tarefas.');
+        
+        showToast('Planilha atualizada com sucesso!');
+        await fetchTasks(); // Refresh to fetch correct row numbers
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, true);
+        await fetchTasks(); // Rollback on error
+    }
 }
