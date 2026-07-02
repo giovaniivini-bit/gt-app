@@ -452,7 +452,6 @@ body {
     flex-direction: column;
     gap: 0;
     transition: all var(--transition-speed) ease;
-    animation: fadeInUp 0.4s ease-out;
 }
 
 .task-card:hover {
@@ -1555,7 +1554,7 @@ body {
 
 /* Collapsed Column inner layout adjustments */
 /* Card Unfolding Cascading Reveal Animation (Google Tasks style) */
-.list-column:not(.collapsed) .task-card {
+.list-column.animating-unfold .task-card {
     animation: cardCascade 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
@@ -1571,21 +1570,21 @@ body {
 }
 
 /* Staggered delay for cards 1 to 15 to unfold sequentially */
-.list-column:not(.collapsed) .task-card:nth-child(1) { animation-delay: 0.03s; }
-.list-column:not(.collapsed) .task-card:nth-child(2) { animation-delay: 0.06s; }
-.list-column:not(.collapsed) .task-card:nth-child(3) { animation-delay: 0.09s; }
-.list-column:not(.collapsed) .task-card:nth-child(4) { animation-delay: 0.12s; }
-.list-column:not(.collapsed) .task-card:nth-child(5) { animation-delay: 0.15s; }
-.list-column:not(.collapsed) .task-card:nth-child(6) { animation-delay: 0.18s; }
-.list-column:not(.collapsed) .task-card:nth-child(7) { animation-delay: 0.21s; }
-.list-column:not(.collapsed) .task-card:nth-child(8) { animation-delay: 0.24s; }
-.list-column:not(.collapsed) .task-card:nth-child(9) { animation-delay: 0.27s; }
-.list-column:not(.collapsed) .task-card:nth-child(10) { animation-delay: 0.30s; }
-.list-column:not(.collapsed) .task-card:nth-child(11) { animation-delay: 0.33s; }
-.list-column:not(.collapsed) .task-card:nth-child(12) { animation-delay: 0.36s; }
-.list-column:not(.collapsed) .task-card:nth-child(13) { animation-delay: 0.39s; }
-.list-column:not(.collapsed) .task-card:nth-child(14) { animation-delay: 0.42s; }
-.list-column:not(.collapsed) .task-card:nth-child(15) { animation-delay: 0.45s; }
+.list-column.animating-unfold .task-card:nth-child(1) { animation-delay: 0.03s; }
+.list-column.animating-unfold .task-card:nth-child(2) { animation-delay: 0.06s; }
+.list-column.animating-unfold .task-card:nth-child(3) { animation-delay: 0.09s; }
+.list-column.animating-unfold .task-card:nth-child(4) { animation-delay: 0.12s; }
+.list-column.animating-unfold .task-card:nth-child(5) { animation-delay: 0.15s; }
+.list-column.animating-unfold .task-card:nth-child(6) { animation-delay: 0.18s; }
+.list-column.animating-unfold .task-card:nth-child(7) { animation-delay: 0.21s; }
+.list-column.animating-unfold .task-card:nth-child(8) { animation-delay: 0.24s; }
+.list-column.animating-unfold .task-card:nth-child(9) { animation-delay: 0.27s; }
+.list-column.animating-unfold .task-card:nth-child(10) { animation-delay: 0.30s; }
+.list-column.animating-unfold .task-card:nth-child(11) { animation-delay: 0.33s; }
+.list-column.animating-unfold .task-card:nth-child(12) { animation-delay: 0.36s; }
+.list-column.animating-unfold .task-card:nth-child(13) { animation-delay: 0.39s; }
+.list-column.animating-unfold .task-card:nth-child(14) { animation-delay: 0.42s; }
+.list-column.animating-unfold .task-card:nth-child(15) { animation-delay: 0.45s; }
 
 /* Card layout adjustments (Actions Top-Right, Text Bottom) */
 .card-header-row {

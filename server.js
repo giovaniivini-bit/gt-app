@@ -290,8 +290,6 @@ app.get('/api/tasks', async (req, res) => {
     res.status(500).json({ error: 'Erro ao obter tarefas da planilha: ' + error.message });
   }
 });
-
-// Add a new task (append to the end of the user's list)
 app.post('/api/tasks/add', async (req, res) => {
   const { person, task, observation, classification } = req.body;
   if (!person || !task) {
@@ -309,65 +307,139 @@ app.post('/api/tasks/add', async (req, res) => {
     const auth = getOAuth2Client();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Fetch the task column to locate the last non-empty row
-    const response = await sheets.spreadsheets.values.get({
+    // Fetch all sheet columns to locate and get full cell metadata for the user
+    let maxColIdx = 3;
+    users.forEach(u => {
+      if (u.colIdx + 1 > maxColIdx) maxColIdx = u.colIdx + 1;
+    });
+    const maxColLetter = indexToColumnLetter(maxColIdx);
+
+    const tasksResponse = await sheets.spreadsheets.get({
       spreadsheetId: TASKS_SPREADSHEET_ID,
-      range: `'APP '!${user.taskCol}1:${user.taskCol}150`
+      ranges: [`'APP '!D1:${maxColLetter}150`],
+      fields: "sheets(properties(sheetId),data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat,userEnteredFormat))))"
     });
 
-    const rows = response.data.values || [];
-    
-    // Find the last row with non-empty text
-    let lastFilledRow = 3; // headers are on row 3
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (rows[i] && rows[i][0] && rows[i][0].trim()) {
-        lastFilledRow = i + 1;
-        break;
-      }
+    const sheet = tasksResponse.data.sheets[0];
+    const sheetId = sheet.properties.sheetId;
+    const rowData = sheet.data[0].rowData || [];
+
+    const relTaskIdx = user.colIdx - 3;
+    const relObsIdx = relTaskIdx + 1;
+
+    // Load current cells from row 4 (index 3) to 150
+    const userCells = [];
+    const maxRows = 150;
+    for (let r = 3; r < maxRows; r++) {
+      const row = rowData[r] || {};
+      const values = row.values || [];
+      const taskCell = values[relTaskIdx] || {};
+      const obsCell = values[relObsIdx] || {};
+      userCells.push({
+        taskCell: taskCell,
+        obsCell: obsCell
+      });
     }
 
-    const newRow = lastFilledRow + 1;
-
-    // Prep classification prefix
+    // Prepare new cells for insertion at index 0 (row 4)
     let finalTaskText = task;
     if (classification === 'urgente') finalTaskText = `[URGENTE] ${task}`;
     else if (classification === 'semanal') finalTaskText = `[SEMANAL] ${task}`;
     else if (classification === 'mensal') finalTaskText = `[MENSAL] ${task}`;
 
-    // Write task to taskCol and observation to obsCol
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: TASKS_SPREADSHEET_ID,
-      range: `'APP '!${user.taskCol}${newRow}`,
-      valueInputOption: "RAW",
-      resource: {
-        values: [[finalTaskText]]
-      }
+    const newTaskCell = {
+      userEnteredValue: { stringValue: finalTaskText }
+    };
+
+    const newObsCell = {
+      userEnteredValue: { stringValue: observation || "" }
+    };
+
+    // Insert at the beginning
+    userCells.unshift({
+      taskCell: newTaskCell,
+      obsCell: newObsCell
     });
 
-    if (observation) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: TASKS_SPREADSHEET_ID,
-        range: `'APP '!${user.obsCol}${newRow}`,
-        valueInputOption: "RAW",
-        resource: {
-          values: [[observation]]
-        }
+    // Keep only up to 147 rows to avoid expanding past row 150
+    if (userCells.length > 147) {
+      userCells.length = 147;
+    }
+
+    // Build row data for updateCells
+    const rows = [];
+    for (let i = 0; i < userCells.length; i++) {
+      const cellObj = userCells[i];
+      const taskData = {};
+      const obsData = {};
+
+      if (cellObj.taskCell.userEnteredValue) {
+        taskData.userEnteredValue = cellObj.taskCell.userEnteredValue;
+      } else {
+        taskData.userEnteredValue = { stringValue: "" };
+      }
+
+      if (cellObj.taskCell.userEnteredFormat) {
+        taskData.userEnteredFormat = cellObj.taskCell.userEnteredFormat;
+      } else if (cellObj.taskCell.effectiveFormat) {
+        taskData.userEnteredFormat = cellObj.taskCell.effectiveFormat;
+      }
+
+      if (cellObj.obsCell.userEnteredValue) {
+        obsData.userEnteredValue = cellObj.obsCell.userEnteredValue;
+      } else {
+        obsData.userEnteredValue = { stringValue: "" };
+      }
+
+      if (cellObj.obsCell.userEnteredFormat) {
+        obsData.userEnteredFormat = cellObj.obsCell.userEnteredFormat;
+      } else if (cellObj.obsCell.effectiveFormat) {
+        obsData.userEnteredFormat = cellObj.obsCell.effectiveFormat;
+      }
+
+      rows.push({
+        values: [taskData, obsData]
       });
     }
+
+    // Write back to sheet using updateCells in batchUpdate
+    const updateRequest = {
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            updateCells: {
+              rows: rows,
+              fields: "userEnteredValue,userEnteredFormat",
+              range: {
+                sheetId: sheetId,
+                startRowIndex: 3,
+                endRowIndex: 3 + userCells.length,
+                startColumnIndex: user.colIdx,
+                endColumnIndex: user.colIdx + 2
+              }
+            }
+          }
+        ]
+      }
+    };
+
+    await sheets.spreadsheets.batchUpdate(updateRequest);
 
     res.json({
       success: true,
       task: {
-        row: newRow,
+        row: 4, // new task is always at row 4
         task,
         classification: classification || '',
         observation: observation || '',
         completed: false
       }
     });
+
   } catch (error) {
-    console.error('Erro ao adicionar tarefa:', error);
-    res.status(500).json({ error: 'Erro ao salvar nova pendência: ' + error.message });
+    console.error('Erro ao adicionar tarefa no topo:', error);
+    res.status(500).json({ error: 'Erro ao salvar nova pendência no topo: ' + error.message });
   }
 });
 

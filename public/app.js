@@ -229,9 +229,16 @@ function toggleColumnCollapse(lowerName) {
     if (isCollapsed) {
         col.classList.add('collapsed');
         container.classList.add('collapsed');
+        col.classList.remove('animating-unfold');
     } else {
         col.classList.remove('collapsed');
         container.classList.remove('collapsed');
+        
+        // Add class for cascade animation and remove it after animation finishes
+        col.classList.add('animating-unfold');
+        setTimeout(() => {
+            col.classList.remove('animating-unfold');
+        }, 1200); // 1.2s to cover all staggered delays
     }
 }
 
@@ -582,6 +589,15 @@ async function handleAddTask(e) {
         
         // Update column skeletons and fetch updated data
         renderColumnsSkeleton();
+        
+        const col = document.getElementById(`column-${ownerId}`);
+        if (col) {
+            col.classList.add('animating-unfold');
+            setTimeout(() => {
+                col.classList.remove('animating-unfold');
+            }, 1200);
+        }
+
         await fetchTasks();
     } catch (err) {
         console.error(err);
@@ -701,7 +717,7 @@ async function changeClassification(person, row, newClassification) {
 
         // Update locally first for smooth transition
         taskItem.classification = newClassification === 'none' ? '' : newClassification;
-        renderAllTasks();
+        renderColumnTasks(person.toLowerCase(), userList);
 
         const res = await fetch('/api/tasks/classify', {
             method: 'POST',
@@ -732,7 +748,7 @@ async function changeClassification(person, row, newClassification) {
         }
 
         taskItem.classification = newClassification === 'none' ? '' : newClassification;
-        renderAllTasks();
+        renderColumnTasks(person.toLowerCase(), userList);
         showToast('Classificação atualizada com sucesso!');
         
     } catch (err) {
