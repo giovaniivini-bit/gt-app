@@ -168,6 +168,50 @@
         </div>
     </div>
 
+    <!-- Modal: View / Upload Image -->
+    <div id="modal-task-image" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-image"></i> Imagem Anexa</h3>
+                <button class="btn-close-modal" onclick="closeModal('modal-task-image')">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px; align-items: center; justify-content: center; padding: 20px 0;">
+                <!-- Preview / Image display -->
+                <div id="task-image-preview-container" class="hidden" style="width: 100%; text-align: center; position: relative;">
+                    <img id="task-image-preview" src="" alt="Anexo" style="max-width: 100%; max-height: 350px; border-radius: 12px; border: 1px solid var(--border-color); object-fit: contain;">
+                </div>
+                
+                <!-- Upload dropzone/button -->
+                <div id="task-image-upload-container" class="task-image-dropzone" onclick="triggerImageFileInput()" style="width: 100%; border: 2px dashed var(--border-color); border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;"></i>
+                    <p style="font-size: 0.95rem; color: var(--text-muted); margin: 0;">Arraste uma imagem ou clique para selecionar</p>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); opacity: 0.7;">Formatos aceitos: JPG, PNG, GIF, WEBP</span>
+                </div>
+                
+                <!-- Hidden File Input -->
+                <input type="file" id="task-image-file-input" accept="image/*" class="hidden" onchange="handleImageFileSelected(this)">
+                
+                <input type="hidden" id="task-image-person">
+                <input type="hidden" id="task-image-row">
+                <input type="hidden" id="task-image-text">
+            </div>
+            
+            <div class="modal-actions" style="width: 100%; display: flex; justify-content: space-between; gap: 12px;">
+                <button id="btn-delete-task-image" class="btn btn-secondary hidden" onclick="deleteTaskImage()" style="background: rgba(220, 53, 69, 0.1); border-color: rgba(220, 53, 69, 0.2); color: #ff5f70;" title="Excluir imagem">
+                    <i class="fa-solid fa-trash-can"></i> Excluir
+                </button>
+                <div style="display: flex; gap: 12px; margin-left: auto;">
+                    <button id="btn-replace-task-image" class="btn btn-secondary hidden" onclick="triggerImageFileInput()">
+                        <i class="fa-solid fa-arrows-rotate"></i> Substituir
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-task-image')">Fechar</button>
+                    <button id="btn-save-task-image" class="btn btn-submit hidden" onclick="saveTaskImage()">Salvar Imagem</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

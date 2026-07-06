@@ -14,7 +14,8 @@ const TASKS_SPREADSHEET_ID = '1vT9cyW60L-_UJ2ySy-JDUMsirAEfLpYxkZ6zkMEMf3E';
 
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 // Helper to convert column index to Excel-like letter (e.g. 3 -> D, 26 -> AA)
 function indexToColumnLetter(index) {
@@ -64,6 +65,53 @@ function loadUsers() {
     return [];
   }
 }
+
+const IMAGES_FILE = path.join(__dirname, 'data', 'task_images.json');
+
+// Ensure directory and file exist
+function initImagesStorage() {
+  const dir = path.join(__dirname, 'data');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const uploadsDir = path.join(__dirname, 'public', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  if (!fs.existsSync(IMAGES_FILE)) {
+    fs.writeFileSync(IMAGES_FILE, JSON.stringify({}), 'utf8');
+  }
+}
+
+function loadImagesMap() {
+  try {
+    initImagesStorage();
+    if (fs.existsSync(IMAGES_FILE)) {
+      return JSON.parse(fs.readFileSync(IMAGES_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading task images:', e);
+  }
+  return {};
+}
+
+function saveImagesMap(map) {
+  try {
+    initImagesStorage();
+    fs.writeFileSync(IMAGES_FILE, JSON.stringify(map, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error saving task images:', e);
+  }
+}
+
+function getTaskKey(owner, taskText) {
+  if (!taskText) return '';
+  const cleanText = taskText.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return `${owner.toLowerCase()}_${cleanText}`;
+}
+
+// Initialize images folders and JSON map file
+initImagesStorage();
 
 // Get user list
 app.get('/api/users', (req, res) => {
@@ -215,6 +263,7 @@ app.get('/api/tasks', async (req, res) => {
     users.forEach(u => {
       result[u.name.toLowerCase()] = [];
     });
+    const imagesMap = loadImagesMap();
 
     // Helper to safely extract cell details
     const getCellDetail = (values, relIdx) => {
@@ -272,12 +321,16 @@ app.get('/api/tasks', async (req, res) => {
             cleanTask = cleanTask.substring(8).trim();
           }
 
+          const taskKey = getTaskKey(u.name, cleanTask);
+          const imageUrl = imagesMap[taskKey] ? `/uploads/${imagesMap[taskKey]}` : null;
+
           result[u.name.toLowerCase()].push({
             row: r_idx + 1,
             task: cleanTask,
             classification: classification,
             observation: obsData.val,
-            completed: taskData.strikethrough
+            completed: taskData.strikethrough,
+            imageUrl: imageUrl
           });
         }
       });
@@ -540,9 +593,21 @@ app.post('/api/tasks/edit', async (req, res) => {
       currentText = cellValues[0][0] || '';
     }
 
+    // Strip prefix from old text to get old clean text
+    let cleanOldText = currentText;
+    const upperText = currentText.toUpperCase();
+    if (upperText.startsWith('[URGENTE]')) {
+      cleanOldText = currentText.substring(9).trim();
+    } else if (upperText.startsWith('[SEMANAL]')) {
+      cleanOldText = currentText.substring(9).trim();
+    } else if (upperText.startsWith('[MENSAL]')) {
+      cleanOldText = currentText.substring(8).trim();
+    } else {
+      cleanOldText = currentText.trim();
+    }
+
     // Check current prefix
     let prefix = '';
-    const upperText = currentText.toUpperCase();
     if (upperText.startsWith('[URGENTE]')) prefix = '[URGENTE] ';
     else if (upperText.startsWith('[SEMANAL]')) prefix = '[SEMANAL] ';
     else if (upperText.startsWith('[MENSAL]')) prefix = '[MENSAL] ';
@@ -551,6 +616,20 @@ app.post('/api/tasks/edit', async (req, res) => {
     let finalTaskText = task.trim();
     if (prefix && !finalTaskText.startsWith('=')) {
       finalTaskText = prefix + finalTaskText;
+    }
+
+    // Update imagesMap if the text changed!
+    const cleanNewText = task.trim();
+    if (cleanOldText !== cleanNewText) {
+      const imagesMap = loadImagesMap();
+      const oldKey = getTaskKey(person, cleanOldText);
+      const newKey = getTaskKey(person, cleanNewText);
+      
+      if (imagesMap[oldKey]) {
+        imagesMap[newKey] = imagesMap[oldKey];
+        delete imagesMap[oldKey];
+        saveImagesMap(imagesMap);
+      }
     }
 
     // Write back to sheet
@@ -846,6 +925,77 @@ function getLocalIpAddress() {
   }
   return '127.0.0.1';
 }
+
+// Image Upload Endpoint (Receives base64 encoded image)
+app.post('/api/tasks/image/upload', async (req, res) => {
+  const { person, task, imageBase64, mimeType } = req.body;
+  if (!person || !task || !imageBase64) {
+    return res.status(400).json({ error: 'Responsável, pendência e imagem em Base64 são obrigatórios.' });
+  }
+
+  try {
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    
+    // Determine extension from mimeType
+    let ext = 'png';
+    if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') ext = 'jpg';
+    else if (mimeType === 'image/gif') ext = 'gif';
+    else if (mimeType === 'image/webp') ext = 'webp';
+    
+    const filename = `${person.toLowerCase()}_${Date.now()}.${ext}`;
+    const filePath = path.join(__dirname, 'public', 'uploads', filename);
+    
+    fs.writeFileSync(filePath, buffer);
+    
+    // Save to mapping
+    const imagesMap = loadImagesMap();
+    const taskKey = getTaskKey(person, task);
+    
+    // If there was an old image, delete the old file
+    if (imagesMap[taskKey]) {
+      const oldFilePath = path.join(__dirname, 'public', 'uploads', imagesMap[taskKey]);
+      if (fs.existsSync(oldFilePath)) {
+        try { fs.unlinkSync(oldFilePath); } catch (e) {}
+      }
+    }
+    
+    imagesMap[taskKey] = filename;
+    saveImagesMap(imagesMap);
+    
+    res.json({ success: true, imageUrl: `/uploads/${filename}` });
+  } catch (error) {
+    console.error('Erro ao fazer upload da imagem:', error);
+    res.status(500).json({ error: 'Erro ao fazer upload da imagem: ' + error.message });
+  }
+});
+
+// Image Delete Endpoint
+app.post('/api/tasks/image/delete', async (req, res) => {
+  const { person, task } = req.body;
+  if (!person || !task) {
+    return res.status(400).json({ error: 'Responsável e pendência são obrigatórios.' });
+  }
+
+  try {
+    const imagesMap = loadImagesMap();
+    const taskKey = getTaskKey(person, task);
+    
+    if (imagesMap[taskKey]) {
+      const filePath = path.join(__dirname, 'public', 'uploads', imagesMap[taskKey]);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) {}
+      }
+      delete imagesMap[taskKey];
+      saveImagesMap(imagesMap);
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao deletar imagem:', error);
+    res.status(500).json({ error: 'Erro ao deletar imagem: ' + error.message });
+  }
+});
 
 // Info endpoint for mobile access
 app.get('/api/info', (req, res) => {

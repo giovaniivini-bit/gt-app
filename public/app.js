@@ -339,6 +339,9 @@ function renderColumnTasks(lowerName, list) {
                     <button class="btn-card-action btn-delete-task" onclick="deleteTaskConfirm('${lowerName}', ${item.row})" title="Excluir pendência">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
+                    <button class="btn-card-action btn-image ${item.imageUrl ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, '${item.imageUrl || ''}')" title="Imagem anexa">
+                        <i class="fa-solid fa-image"></i>
+                    </button>
                     <button id="${buttonId}" class="btn-comment ${hasComment ? 'has-comment' : ''}" onclick="toggleComment('${lowerName}', ${item.row})" title="Observações">
                         <i class="${hasComment ? 'fa-solid fa-comment' : 'fa-regular fa-comment'}"></i>
                     </button>
@@ -402,6 +405,173 @@ function toggleComment(lowerName, row) {
     } else {
         // Close
         container.classList.add('collapsed');
+    }
+}
+
+let selectedImageBase64 = null;
+let selectedImageMime = null;
+
+// Open Image Modal
+function openImageModal(person, row, taskText, imageUrl) {
+    document.getElementById('task-image-person').value = person;
+    document.getElementById('task-image-row').value = row;
+    document.getElementById('task-image-text').value = taskText;
+    
+    selectedImageBase64 = null;
+    selectedImageMime = null;
+    
+    const previewContainer = document.getElementById('task-image-preview-container');
+    const uploadContainer = document.getElementById('task-image-upload-container');
+    const previewImg = document.getElementById('task-image-preview');
+    const deleteBtn = document.getElementById('btn-delete-task-image');
+    const replaceBtn = document.getElementById('btn-replace-task-image');
+    const saveBtn = document.getElementById('btn-save-task-image');
+    const fileInput = document.getElementById('task-image-file-input');
+    
+    fileInput.value = ''; // clear previous selection
+    
+    if (imageUrl) {
+        // Task already has an image
+        previewImg.src = imageUrl;
+        previewContainer.classList.remove('hidden');
+        uploadContainer.classList.add('hidden');
+        deleteBtn.classList.remove('hidden');
+        replaceBtn.classList.remove('hidden');
+        saveBtn.classList.add('hidden');
+    } else {
+        // No image yet
+        previewImg.src = '';
+        previewContainer.classList.add('hidden');
+        uploadContainer.classList.remove('hidden');
+        deleteBtn.classList.add('hidden');
+        replaceBtn.classList.add('hidden');
+        saveBtn.classList.add('hidden');
+    }
+    
+    openModal('modal-task-image');
+}
+
+// Trigger hidden file input
+function triggerImageFileInput() {
+    document.getElementById('task-image-file-input').click();
+}
+
+// Handle local file selection
+function handleImageFileSelected(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    // Check file size (limit to 15MB)
+    if (file.size > 15 * 1024 * 1024) {
+        showToast('A imagem selecionada é muito grande. Limite de 15MB.', true);
+        input.value = '';
+        return;
+    }
+    
+    selectedImageMime = file.type;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        selectedImageBase64 = e.target.result;
+        
+        // Show preview
+        const previewImg = document.getElementById('task-image-preview');
+        previewImg.src = selectedImageBase64;
+        
+        document.getElementById('task-image-preview-container').classList.remove('hidden');
+        document.getElementById('task-image-upload-container').classList.add('hidden');
+        document.getElementById('btn-save-task-image').classList.remove('hidden');
+        document.getElementById('btn-replace-task-image').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+
+// Save uploaded image to backend
+async function saveTaskImage() {
+    if (!selectedImageBase64) return;
+    
+    const person = document.getElementById('task-image-person').value;
+    const row = Number(document.getElementById('task-image-row').value);
+    const task = document.getElementById('task-image-text').value;
+    
+    const saveBtn = document.getElementById('btn-save-task-image');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+    
+    try {
+        const res = await fetch('/api/tasks/image/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                person,
+                task,
+                imageBase64: selectedImageBase64,
+                mimeType: selectedImageMime
+            })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao fazer upload.');
+        
+        // Update local state
+        const item = tasksData[person].find(i => i.row === row);
+        if (item) {
+            item.imageUrl = data.imageUrl;
+        }
+        
+        // Rerender column tasks to reflect visual change
+        renderColumnTasks(person, tasksData[person]);
+        
+        showToast('Imagem salva com sucesso!');
+        closeModal('modal-task-image');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao salvar imagem: ' + err.message, true);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Salvar Imagem';
+    }
+}
+
+// Delete image association from backend
+async function deleteTaskImage() {
+    if (!confirm('Deseja realmente remover esta imagem?')) return;
+    
+    const person = document.getElementById('task-image-person').value;
+    const row = Number(document.getElementById('task-image-row').value);
+    const task = document.getElementById('task-image-text').value;
+    
+    const deleteBtn = document.getElementById('btn-delete-task-image');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removendo...';
+    
+    try {
+        const res = await fetch('/api/tasks/image/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ person, task })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao remover imagem.');
+        
+        // Update local state
+        const item = tasksData[person].find(i => i.row === row);
+        if (item) {
+            item.imageUrl = null;
+        }
+        
+        // Rerender column tasks to reflect visual change
+        renderColumnTasks(person, tasksData[person]);
+        
+        showToast('Imagem removida com sucesso!');
+        closeModal('modal-task-image');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao remover imagem: ' + err.message, true);
+    } finally {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Excluir';
     }
 }
 

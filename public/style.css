@@ -577,6 +577,33 @@ body {
     background: rgba(var(--color-primary-rgb), 0.15);
 }
 
+/* Image button styles */
+.btn-image.has-image {
+    color: #a855f7 !important; /* Vibrant purple */
+}
+
+.btn-image.has-image:hover {
+    color: #c084fc !important;
+    background: rgba(168, 85, 247, 0.15) !important;
+}
+
+/* Image upload dropzone style inside modal */
+.task-image-dropzone {
+    border: 2px dashed rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-image-dropzone:hover {
+    border-color: #a855f7 !important;
+    background: rgba(168, 85, 247, 0.05) !important;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.1) !important;
+}
+
 /* Collapsible observation box styles */
 .observation-container {
     max-height: 200px;
