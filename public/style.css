@@ -1177,10 +1177,11 @@ body {
     font-size: 0.9rem;
     cursor: pointer;
     transition: all var(--transition-speed) ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     font-family: var(--font-outfit);
+    text-decoration: none; /* Reset links styling */
 }
 
 .view-tab-btn:hover {
@@ -1194,6 +1195,22 @@ body {
     background: rgba(var(--color-primary-rgb), 0.15);
     border-color: var(--color-primary);
     box-shadow: 0 0 15px rgba(var(--color-primary-rgb), 0.2);
+}
+
+/* External Google Drive shortcuts premium styling */
+.shortcut-btn {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.shortcut-btn i {
+    color: var(--color-accent);
+}
+
+.shortcut-btn:hover {
+    border-color: rgba(var(--color-accent-rgb), 0.4) !important;
+    background: rgba(var(--color-accent-rgb), 0.05) !important;
+    box-shadow: 0 0 15px rgba(var(--color-accent-rgb), 0.1) !important;
 }
 
 /* Dashboard View container */

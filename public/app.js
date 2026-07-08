@@ -116,7 +116,7 @@ function setupEventListeners() {
     });
 
     // View Tab buttons switching
-    const tabBtns = document.querySelectorAll('.view-tab-btn');
+    const tabBtns = document.querySelectorAll('.view-tab-btn[data-view]');
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
@@ -1091,7 +1091,7 @@ function renderDashboard() {
         // Set click behavior to jump to the user's column
         card.addEventListener('click', () => {
             // 1. Switch back to tasks view
-            document.querySelectorAll('.view-tab-btn').forEach(btn => {
+            document.querySelectorAll('.view-tab-btn[data-view]').forEach(btn => {
                 if (btn.dataset.view === 'tasks') btn.classList.add('active');
                 else btn.classList.remove('active');
             });
