@@ -649,15 +649,8 @@ app.post('/api/tasks/classify', async (req, res) => {
           }
 
           rows.push({
-            values: []
+            values: [taskData, obsData]
           });
-          
-          for (let c = 0; c < relTaskIdx; c++) {
-            rows[i].values.push({});
-          }
-
-          rows[i].values.push(taskData);
-          rows[i].values.push(obsData);
         }
 
         const updateRequest = {
@@ -672,8 +665,8 @@ app.post('/api/tasks/classify', async (req, res) => {
                     sheetId: sheetId,
                     startRowIndex: 3,
                     endRowIndex: 3 + userCells.length,
-                    startColumnIndex: 0,
-                    endColumnIndex: maxColIdx
+                    startColumnIndex: user.colIdx,
+                    endColumnIndex: user.colIdx + 2
                   }
                 }
               }
