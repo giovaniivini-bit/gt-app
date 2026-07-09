@@ -601,7 +601,7 @@ body {
 
 /* Collapsible observation box styles */
 .observation-container {
-    max-height: 200px;
+    max-height: 600px;
     opacity: 1;
     overflow: hidden;
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin-top 0.3s ease;
@@ -629,7 +629,7 @@ body {
     padding: 8px 30px 8px 10px;
     color: var(--text-main);
     font-size: 0.8rem;
-    transition: all var(--transition-speed) ease;
+    transition: border-color var(--transition-speed) ease, background-color var(--transition-speed) ease;
     resize: none;
     font-family: var(--font-inter);
 }

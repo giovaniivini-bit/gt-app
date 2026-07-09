@@ -23,6 +23,13 @@ const USER_COLORS = [
     '#50fa7b'  // Mint Green
 ];
 
+// Helper to auto-resize textareas based on content length
+function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+}
+
 // On Load
 document.addEventListener('DOMContentLoaded', () => {
     initDate();
@@ -380,7 +387,7 @@ function renderColumnTasks(lowerName, list) {
             
             <div id="${containerId}" class="observation-container collapsed">
                 <div class="observation-box">
-                    <textarea id="${obsId}" class="observation-input" placeholder="Adicionar observações..." rows="2" oninput="saveObservationDebounced('${lowerName}', ${item.row}, this.value, '${lowerName}', '${statusId}', '${buttonId}')">${item.observation || ''}</textarea>
+                    <textarea id="${obsId}" class="observation-input" placeholder="Adicionar observações..." rows="1" oninput="autoResizeTextarea(this); saveObservationDebounced('${lowerName}', ${item.row}, this.value, '${lowerName}', '${statusId}', '${buttonId}')">${item.observation || ''}</textarea>
                     <div id="${statusId}" class="observation-status">
                         <i class="fa-solid fa-spinner fa-spin icon-saving"></i>
                         <i class="fa-solid fa-check icon-saved"></i>
@@ -411,7 +418,11 @@ function toggleComment(lowerName, row) {
     if (container.classList.contains('collapsed')) {
         // Open
         container.classList.remove('collapsed');
-        setTimeout(() => textarea.focus(), 100);
+        autoResizeTextarea(textarea);
+        setTimeout(() => {
+            textarea.focus();
+            autoResizeTextarea(textarea);
+        }, 100);
     } else {
         // Close
         container.classList.add('collapsed');
