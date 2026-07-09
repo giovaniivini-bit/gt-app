@@ -408,8 +408,29 @@ app.post('/api/tasks/add', async (req, res) => {
       userEnteredValue: { stringValue: observation || "" }
     };
 
-    // Insert at the beginning
-    userCells.unshift({
+    // If classification is urgent, insert at index 0 (row 4)
+    // Otherwise, insert below any existing urgent tasks
+    let insertIndex = 0;
+    if (classification !== 'urgente') {
+      for (let i = 0; i < userCells.length; i++) {
+        const cell = userCells[i].taskCell;
+        let val = '';
+        if (cell) {
+          if (cell.formattedValue !== undefined) val = cell.formattedValue;
+          else if (cell.userEnteredValue && cell.userEnteredValue.stringValue !== undefined) {
+            val = cell.userEnteredValue.stringValue;
+          }
+        }
+        val = val.trim();
+        if (val.toUpperCase().startsWith('[URGENTE]')) {
+          insertIndex = i + 1;
+        } else {
+          break;
+        }
+      }
+    }
+
+    userCells.splice(insertIndex, 0, {
       taskCell: newTaskCell,
       obsCell: newObsCell
     });
@@ -482,7 +503,7 @@ app.post('/api/tasks/add', async (req, res) => {
     res.json({
       success: true,
       task: {
-        row: 4, // new task is always at row 4
+        row: 4 + insertIndex,
         task,
         classification: classification || '',
         observation: observation || '',
@@ -546,15 +567,133 @@ app.post('/api/tasks/classify', async (req, res) => {
     else if (classification === 'semanal') finalTaskText = `[SEMANAL] ${cleanText}`;
     else if (classification === 'mensal') finalTaskText = `[MENSAL] ${cleanText}`;
 
-    // Write back to sheet
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: TASKS_SPREADSHEET_ID,
-      range: `'APP '!${user.taskCol}${row}`,
-      valueInputOption: "RAW",
-      resource: {
-        values: [[finalTaskText]]
+    if (classification === 'urgente') {
+      // Fetch all sheet columns to locate and get full cell metadata for the user
+      let maxColIdx = 3;
+      users.forEach(u => {
+        if (u.colIdx + 1 > maxColIdx) maxColIdx = u.colIdx + 1;
+      });
+      const maxColLetter = indexToColumnLetter(maxColIdx);
+
+      const tasksResponse = await sheets.spreadsheets.get({
+        spreadsheetId: TASKS_SPREADSHEET_ID,
+        ranges: [`'APP '!D1:${maxColLetter}150`],
+        fields: "sheets(properties(sheetId),data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat,userEnteredFormat))))"
+      });
+
+      const sheet = tasksResponse.data.sheets[0];
+      const sheetId = sheet.properties.sheetId;
+      const rowData = sheet.data[0].rowData || [];
+
+      const relTaskIdx = user.colIdx - 3;
+      const relObsIdx = relTaskIdx + 1;
+
+      // Load current cells from row 4 (index 3) to 150
+      const userCells = [];
+      const maxRows = 150;
+      for (let r = 3; r < maxRows; r++) {
+        const rowVal = rowData[r] || {};
+        const values = rowVal.values || [];
+        const taskCell = values[relTaskIdx] || {};
+        const obsCell = values[relObsIdx] || {};
+        userCells.push({
+          taskCell: taskCell,
+          obsCell: obsCell
+        });
       }
-    });
+
+      const targetIdx = row - 4;
+      if (targetIdx >= 0 && targetIdx < userCells.length) {
+        const [movedItem] = userCells.splice(targetIdx, 1);
+        
+        // Update its value with finalTaskText
+        movedItem.taskCell.userEnteredValue = { stringValue: finalTaskText };
+        
+        // Insert at the beginning
+        userCells.unshift(movedItem);
+
+        // Keep up to 147 rows
+        if (userCells.length > 147) {
+          userCells.length = 147;
+        }
+
+        // Build row data for updateCells
+        const rows = [];
+        for (let i = 0; i < userCells.length; i++) {
+          const cellObj = userCells[i];
+          const taskData = {};
+          const obsData = {};
+
+          if (cellObj.taskCell.userEnteredValue) {
+            taskData.userEnteredValue = cellObj.taskCell.userEnteredValue;
+          } else {
+            taskData.userEnteredValue = { stringValue: "" };
+          }
+
+          if (cellObj.taskCell.userEnteredFormat) {
+            taskData.userEnteredFormat = cellObj.taskCell.userEnteredFormat;
+          } else if (cellObj.taskCell.effectiveFormat) {
+            taskData.userEnteredFormat = cellObj.taskCell.effectiveFormat;
+          }
+
+          if (cellObj.obsCell.userEnteredValue) {
+            obsData.userEnteredValue = cellObj.obsCell.userEnteredValue;
+          } else {
+            obsData.userEnteredValue = { stringValue: "" };
+          }
+
+          if (cellObj.obsCell.userEnteredFormat) {
+            obsData.userEnteredFormat = cellObj.obsCell.userEnteredFormat;
+          } else if (cellObj.obsCell.effectiveFormat) {
+            obsData.userEnteredFormat = cellObj.obsCell.effectiveFormat;
+          }
+
+          rows.push({
+            values: []
+          });
+          
+          for (let c = 0; c < relTaskIdx; c++) {
+            rows[i].values.push({});
+          }
+
+          rows[i].values.push(taskData);
+          rows[i].values.push(obsData);
+        }
+
+        const updateRequest = {
+          spreadsheetId: TASKS_SPREADSHEET_ID,
+          resource: {
+            requests: [
+              {
+                updateCells: {
+                  rows: rows,
+                  fields: "userEnteredValue,userEnteredFormat",
+                  range: {
+                    sheetId: sheetId,
+                    startRowIndex: 3,
+                    endRowIndex: 3 + userCells.length,
+                    startColumnIndex: 0,
+                    endColumnIndex: maxColIdx
+                  }
+                }
+              }
+            ]
+          }
+        };
+
+        await sheets.spreadsheets.batchUpdate(updateRequest);
+      }
+    } else {
+      // Write back to sheet (non-urgent prefix change)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: TASKS_SPREADSHEET_ID,
+        range: `'APP '!${user.taskCol}${row}`,
+        valueInputOption: "RAW",
+        resource: {
+          values: [[finalTaskText]]
+        }
+      });
+    }
     
     res.json({ success: true, message: 'Classificação atualizada.', taskText: finalTaskText });
 

@@ -10,6 +10,19 @@ let debounceTimers = {};
 let editingUser = null;
 let currentView = 'tasks';
 
+const USER_COLORS = [
+    '#b85eff', // Purple (Ketlyn)
+    '#ff9100', // Orange (Ariel)
+    '#00e5ff', // Cyan
+    '#00ff88', // Green
+    '#ff455b', // Red/Rose
+    '#ffd740', // Amber
+    '#448aff', // Blue
+    '#ff79c6', // Pink
+    '#f1fa8c', // Light Yellow
+    '#50fa7b'  // Mint Green
+];
+
 // On Load
 document.addEventListener('DOMContentLoaded', () => {
     initDate();
@@ -162,7 +175,7 @@ function renderColumnsSkeleton() {
         return;
     }
 
-    users.forEach(u => {
+    users.forEach((u, index) => {
         const lowerName = u.name.toLowerCase();
         const isCollapsed = collapsedColumns[lowerName];
         
@@ -171,11 +184,8 @@ function renderColumnsSkeleton() {
         col.id = `column-${lowerName}`;
         
         // Handle dynamic colors
-        if (lowerName === 'ketlyn' || lowerName === 'ariel') {
-            col.setAttribute('data-user', lowerName);
-        } else {
-            col.setAttribute('data-user-dynamic', 'true');
-        }
+        const userColor = USER_COLORS[index % USER_COLORS.length];
+        col.style.setProperty('--user-color', userColor);
 
         col.innerHTML = `
             <div class="column-header">
@@ -918,7 +928,11 @@ async function changeClassification(person, row, newClassification) {
         }
 
         taskItem.classification = newClassification === 'none' ? '' : newClassification;
-        renderColumnTasks(person.toLowerCase(), userList);
+        if (newClassification === 'urgente') {
+            await fetchTasks();
+        } else {
+            renderColumnTasks(person.toLowerCase(), userList);
+        }
         showToast('Classificação atualizada com sucesso!');
         
     } catch (err) {
@@ -1069,7 +1083,7 @@ function renderDashboard() {
         return;
     }
 
-    userStats.forEach(stat => {
+    userStats.forEach((stat, index) => {
         const lowerName = stat.user.name.toLowerCase();
         
         // Progress segments percentages
@@ -1082,11 +1096,8 @@ function renderDashboard() {
         const card = document.createElement('div');
         card.className = 'user-summary-card glass-panel';
         
-        if (lowerName === 'ketlyn' || lowerName === 'ariel') {
-            card.setAttribute('data-user', lowerName);
-        } else {
-            card.setAttribute('data-user-dynamic', 'true');
-        }
+        const userColor = USER_COLORS[index % USER_COLORS.length];
+        card.style.setProperty('--user-color', userColor);
 
         // Set click behavior to jump to the user's column
         card.addEventListener('click', () => {
