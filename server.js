@@ -231,6 +231,44 @@ app.put('/api/users', async (req, res) => {
   }
 });
 
+// Delete user and clear their columns in the spreadsheet
+app.delete('/api/users', async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: 'Nome do usuário é obrigatório.' });
+  }
+
+  try {
+    const users = loadUsers();
+    const userIndex = users.findIndex(u => u.name.toLowerCase() === name.toLowerCase());
+
+    if (userIndex === -1) {
+      return res.status(404).json({ error: `Usuário '${name}' não encontrado.` });
+    }
+
+    const user = users[userIndex];
+
+    // Clear their columns in the Sheets (row 3 to 150)
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      range: `'APP '!${user.taskCol}3:${user.obsCol}150`
+    });
+
+    // Remove from users list
+    users.splice(userIndex, 1);
+    fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2));
+
+    res.json({ success: true, message: `Usuário '${name}' excluído com sucesso.` });
+
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error);
+    res.status(500).json({ error: 'Erro ao excluir usuário no Sheets: ' + error.message });
+  }
+});
+
 // Fetch all tasks dynamically for all users
 app.get('/api/tasks', async (req, res) => {
   try {

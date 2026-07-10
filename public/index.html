@@ -131,6 +131,7 @@
                     <input type="email" id="reg-email" placeholder="Ex: lucas@confeccoesoneda.com.br" required autocomplete="off">
                 </div>
                 <div class="modal-actions">
+                    <button type="button" class="btn btn-danger hidden" id="btn-delete-user" onclick="handleDeleteUser()" style="background: rgba(244, 67, 54, 0.15); border: 1px solid rgba(244, 67, 54, 0.3); color: #ff5252; margin-right: auto; font-weight: 600;">Excluir Usuário</button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-user-modal" onclick="closeModal('modal-register-user')">Cancelar</button>
                     <button type="button" class="btn btn-secondary hidden" id="btn-cancel-edit-user" onclick="cancelEditUser()">Cancelar Edição</button>
                     <button type="submit" class="btn btn-submit" id="btn-submit-user">Cadastrar</button>

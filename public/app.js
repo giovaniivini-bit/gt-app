@@ -847,6 +847,8 @@ function startEditUser(userName) {
     
     // Show Cancel Edit Button
     document.getElementById('btn-cancel-edit-user').classList.remove('hidden');
+    // Show Delete User Button
+    document.getElementById('btn-delete-user').classList.remove('hidden');
     // Hide Close Modal Button
     document.getElementById('btn-cancel-user-modal').classList.add('hidden');
 }
@@ -865,8 +867,39 @@ function cancelEditUser() {
     
     // Hide Cancel Edit Button
     document.getElementById('btn-cancel-edit-user').classList.add('hidden');
+    // Hide Delete User Button
+    document.getElementById('btn-delete-user').classList.add('hidden');
     // Show Close Modal Button
     document.getElementById('btn-cancel-user-modal').classList.remove('hidden');
+}
+
+// Handle Delete User Click
+async function handleDeleteUser() {
+    if (!editingUser) return;
+    
+    const confirmDelete = confirm(`Deseja realmente EXCLUIR o usuário "${editingUser}"? Todas as tarefas dele serão apagadas da planilha.`);
+    if (!confirmDelete) return;
+    
+    try {
+        const res = await fetch('/api/users', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: editingUser })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao excluir usuário.');
+        
+        showToast(`Usuário "${editingUser}" excluído com sucesso!`);
+        cancelEditUser();
+        closeModal('modal-register-user');
+        
+        // Reload configuration and tasks
+        await fetchUsers();
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, true);
+    }
 }
 
 // Modal control helpers
