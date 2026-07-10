@@ -602,8 +602,8 @@ async function toggleTask(person, row, checked) {
     if (item) {
         item.completed = checked;
         
-        // Find card in DOM and add class instantly
-        const cards = document.querySelectorAll(`#container-${person} .task-card`);
+        // Find card in DOM and add class instantly (using attribute selector to support spaces in user names)
+        const cards = document.querySelectorAll(`[id="container-${person}"] .task-card`);
         for (let card of cards) {
             if (Number(card.dataset.row) === row) {
                 if (checked) card.classList.add('completed');
