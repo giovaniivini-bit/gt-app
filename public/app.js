@@ -1619,7 +1619,7 @@ async function handleTouchEnd(e) {
 // Open Date Selector Modal
 // Open Date Selector Modal
 function openDateModal(person, row) {
-    const item = tasksData[person].find(i => i.row === row);
+    const item = tasksData[person].find(i => Number(i.row) === Number(row));
     if (!item) return;
     const taskText = item.task;
     const currentDate = item.date;
@@ -1631,13 +1631,29 @@ function openDateModal(person, row) {
     document.getElementById('task-date-task-desc').textContent = `Tarefa: "${taskText}"`;
     
     const dateInput = document.getElementById('task-date-input');
-    dateInput.value = currentDate || '';
+    if (dateInput) {
+        try {
+            let val = '';
+            if (currentDate) {
+                if (currentDate.includes('T')) {
+                    val = currentDate;
+                } else {
+                    val = `${currentDate}T12:00`;
+                }
+            }
+            dateInput.value = val;
+        } catch (e) {
+            console.error('Erro ao definir data:', e);
+        }
+    }
     
     const deleteBtn = document.getElementById('btn-delete-task-date');
-    if (currentDate) {
-        deleteBtn.classList.remove('hidden');
-    } else {
-        deleteBtn.classList.add('hidden');
+    if (deleteBtn) {
+        if (currentDate) {
+            deleteBtn.classList.remove('hidden');
+        } else {
+            deleteBtn.classList.add('hidden');
+        }
     }
     
     openModal('modal-task-date');
