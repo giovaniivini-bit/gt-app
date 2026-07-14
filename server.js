@@ -129,6 +129,173 @@ function saveDatesMap(map) {
   }
 }
 
+const COMPROMISSOS_ID_FILE = path.join(__dirname, 'data', 'compromissos_spreadsheet_id.txt');
+
+async function getOrCreateCompromissosSpreadsheet() {
+  if (fs.existsSync(COMPROMISSOS_ID_FILE)) {
+    const id = fs.readFileSync(COMPROMISSOS_ID_FILE, 'utf8').trim();
+    if (id) return id;
+  }
+
+  try {
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const res = await sheets.spreadsheets.create({
+      resource: {
+        properties: {
+          title: 'compromissos APP'
+        },
+        sheets: [
+          {
+            properties: {
+              title: 'Agenda'
+            }
+          }
+        ]
+      }
+    });
+    
+    const spreadsheetId = res.data.spreadsheetId;
+    fs.writeFileSync(COMPROMISSOS_ID_FILE, spreadsheetId, 'utf8');
+    console.log('Criada nova planilha de compromissos com ID:', spreadsheetId);
+    
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'Agenda!A1:D1',
+      valueInputOption: 'RAW',
+      resource: {
+        values: [['Data', 'Responsável', 'Tarefa', 'Status']]
+      }
+    });
+    
+    return spreadsheetId;
+  } catch (error) {
+    console.error('Erro ao criar planilha compromissos APP:', error);
+    throw error;
+  }
+}
+
+async function getActiveTasksWithDates() {
+  const users = loadUsers();
+  if (users.length === 0) return [];
+  
+  let maxColIdx = 3;
+  users.forEach(u => {
+    if (u.colIdx + 1 > maxColIdx) maxColIdx = u.colIdx + 1;
+  });
+  
+  const maxColLetter = indexToColumnLetter(maxColIdx);
+  const auth = getOAuth2Client();
+  const sheets = google.sheets({ version: 'v4', auth });
+  
+  const tasksResponse = await sheets.spreadsheets.get({
+    spreadsheetId: TASKS_SPREADSHEET_ID,
+    ranges: [`'APP '!D1:${maxColLetter}150`],
+    fields: "sheets(properties(sheetId),data(rowData(values(userEnteredValue,effectiveValue,formattedValue,effectiveFormat,userEnteredFormat))))"
+  });
+  
+  const sheetData = tasksResponse.data.sheets[0].data[0];
+  const rowData = sheetData.rowData || [];
+  const datesMap = loadDatesMap();
+  const list = [];
+  
+  const getCellDetail = (values, relIdx) => {
+    if (!values || relIdx >= values.length) return { val: '', strikethrough: false };
+    const cell = values[relIdx];
+    let val = '';
+    if (cell) {
+      if (cell.formattedValue !== undefined) val = cell.formattedValue;
+      else if (cell.effectiveValue && Object.keys(cell.effectiveValue).length > 0) {
+        const keys = Object.keys(cell.effectiveValue);
+        val = String(cell.effectiveValue[keys[0]]);
+      } else if (cell.userEnteredValue && cell.userEnteredValue.formulaValue === undefined) {
+        const keys = Object.keys(cell.userEnteredValue);
+        if (keys.length > 0) val = String(cell.userEnteredValue[keys[0]]);
+      }
+    }
+    
+    let strikethrough = false;
+    if (cell && cell.effectiveFormat && cell.effectiveFormat.textFormat && cell.effectiveFormat.textFormat.strikethrough) {
+      strikethrough = true;
+    } else if (cell && cell.userEnteredFormat && cell.userEnteredFormat.textFormat && cell.userEnteredFormat.textFormat.strikethrough) {
+      strikethrough = true;
+    }
+    return { val, strikethrough };
+  };
+  
+  rowData.forEach((row, r_idx) => {
+    if (r_idx < 3) return;
+    const values = row.values || [];
+    
+    users.forEach(u => {
+      const relTaskIdx = u.colIdx - 3;
+      const taskData = getCellDetail(values, relTaskIdx);
+      
+      if (taskData.val) {
+        const upperVal = taskData.val.toUpperCase();
+        let cleanTask = taskData.val;
+        if (upperVal.startsWith('[URGENTE]')) cleanTask = cleanTask.substring(9).trim();
+        else if (upperVal.startsWith('[SEMANAL]')) cleanTask = cleanTask.substring(9).trim();
+        else if (upperVal.startsWith('[MENSAL]')) cleanTask = cleanTask.substring(8).trim();
+        
+        const taskKey = getTaskKey(u.name, cleanTask);
+        const date = datesMap[taskKey];
+        
+        if (date) {
+          list.push({
+            personName: u.name,
+            task: cleanTask,
+            completed: taskData.strikethrough,
+            date: date
+          });
+        }
+      }
+    });
+  });
+  
+  return list;
+}
+
+async function syncCompromissosSheet() {
+  try {
+    const spreadsheetId = await getOrCreateCompromissosSpreadsheet();
+    const tasksList = await getActiveTasksWithDates();
+    
+    const rows = [['Data', 'Responsável', 'Tarefa', 'Status']];
+    tasksList.forEach(t => {
+      rows.push([
+        t.date,
+        t.personName,
+        t.task,
+        t.completed ? 'Concluída' : 'Pendente'
+      ]);
+    });
+    
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: 'Agenda!A2:D500'
+    });
+    
+    if (rows.length > 1) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Agenda!A1:D${rows.length}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rows
+        }
+      });
+    }
+    console.log('Planilha de compromissos sincronizada.');
+  } catch (e) {
+    console.error('Erro ao sincronizar compromissos APP:', e);
+  }
+}
+
 function getTaskKey(owner, taskText) {
   if (!taskText) return '';
   const cleanText = taskText.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -860,6 +1027,9 @@ app.post('/api/tasks/edit', async (req, res) => {
       }
     });
 
+    // Sync scheduled dates in the background
+    syncCompromissosSheet().catch(e => console.error('Error syncing compromissos:', e));
+
     res.json({ success: true, message: 'Tarefa editada com sucesso.', taskText: finalTaskText });
 
   } catch (error) {
@@ -1001,6 +1171,10 @@ app.post('/api/tasks/update-order', async (req, res) => {
     };
 
     await sheets.spreadsheets.batchUpdate(updateRequest);
+
+    // Sync scheduled dates in the background
+    syncCompromissosSheet().catch(e => console.error('Error syncing compromissos:', e));
+
     res.json({ success: true, message: 'Ordem e tarefas atualizadas com sucesso.' });
 
   } catch (error) {
@@ -1059,6 +1233,10 @@ app.post('/api/tasks/toggle', async (req, res) => {
     };
 
     await sheets.spreadsheets.batchUpdate(request);
+    
+    // Sync scheduled dates in the background
+    syncCompromissosSheet().catch(e => console.error('Error syncing compromissos:', e));
+
     res.json({ success: true, message: 'Status da tarefa atualizado com sucesso.' });
 
   } catch (error) {
@@ -1276,6 +1454,10 @@ app.post('/api/tasks/date/save', async (req, res) => {
     const taskKey = getTaskKey(person, task);
     datesMap[taskKey] = date;
     saveDatesMap(datesMap);
+    
+    // Sync scheduled dates in the background
+    syncCompromissosSheet().catch(e => console.error('Error syncing compromissos:', e));
+
     res.json({ success: true, date });
   } catch (error) {
     console.error('Erro ao agendar data:', error);
@@ -1297,6 +1479,10 @@ app.post('/api/tasks/date/delete', async (req, res) => {
       delete datesMap[taskKey];
       saveDatesMap(datesMap);
     }
+    
+    // Sync scheduled dates in the background
+    syncCompromissosSheet().catch(e => console.error('Error syncing compromissos:', e));
+
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao remover data agendada:', error);

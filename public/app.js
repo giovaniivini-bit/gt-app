@@ -391,10 +391,10 @@ function renderColumnTasks(lowerName, list) {
                     <button class="btn-card-action btn-delete-task" onclick="deleteTaskConfirm('${lowerName}', ${item.row})" title="Excluir pendência">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
-                    <button class="btn-card-action btn-image ${item.attachments && item.attachments.length > 0 ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Arquivos anexos (Imagens/PDFs)">
+                    <button class="btn-card-action btn-image ${item.attachments && item.attachments.length > 0 ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row})" title="Arquivos anexos (Imagens/PDFs)">
                         <i class="fa-solid fa-paperclip"></i>
                     </button>
-                    <button class="btn-card-action btn-date ${item.date ? 'has-date' : ''}" onclick="openDateModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, '${item.date || ''}')" title="Agendar Data">
+                    <button class="btn-card-action btn-date ${item.date ? 'has-date' : ''}" onclick="openDateModal('${lowerName}', ${item.row})" title="Agendar Data">
                         <i class="fa-regular fa-calendar"></i>
                     </button>
                     <button id="${buttonId}" class="btn-comment ${hasComment ? 'has-comment' : ''}" onclick="toggleComment('${lowerName}', ${item.row})" title="Observações">
@@ -420,7 +420,7 @@ function renderColumnTasks(lowerName, list) {
                             <div class="task-date-badge ${isOverdue(item.date, item.completed) ? 'overdue' : ''} ${item.completed ? 'completed-task-date' : ''}">
                                 <i class="fa-regular fa-calendar-days"></i>
                                 <span>${formatDateDisplay(item.date)}</span>
-                                <button class="btn-clear-date" onclick="clearTaskDate('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Remover data agendada">
+                                <button class="btn-clear-date" onclick="clearTaskDate('${lowerName}', ${item.row})" title="Remover data agendada">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </div>
@@ -480,7 +480,11 @@ let selectedImageBase64 = null;
 let selectedImageMime = null;
 
 // Open Attachments Modal
-function openImageModal(person, row, taskText) {
+function openImageModal(person, row) {
+    const item = tasksData[person].find(i => i.row === row);
+    if (!item) return;
+    const taskText = item.task;
+
     document.getElementById('task-image-person').value = person;
     document.getElementById('task-image-row').value = row;
     document.getElementById('task-image-text').value = taskText;
@@ -1592,7 +1596,13 @@ async function handleTouchEnd(e) {
 // Date Scheduling Functions
 
 // Open Date Selector Modal
-function openDateModal(person, row, taskText, currentDate) {
+// Open Date Selector Modal
+function openDateModal(person, row) {
+    const item = tasksData[person].find(i => i.row === row);
+    if (!item) return;
+    const taskText = item.task;
+    const currentDate = item.date;
+
     document.getElementById('task-date-person').value = person;
     document.getElementById('task-date-row').value = row;
     document.getElementById('task-date-text').value = taskText;
@@ -1660,14 +1670,17 @@ async function saveTaskDate() {
 async function deleteTaskDate() {
     const person = document.getElementById('task-date-person').value;
     const row = Number(document.getElementById('task-date-row').value);
-    const task = document.getElementById('task-date-text').value;
     
-    await clearTaskDate(person, row, task);
+    await clearTaskDate(person, row);
     closeModal('modal-task-date');
 }
 
 // Generic function to clear a task's date
-async function clearTaskDate(person, row, task) {
+async function clearTaskDate(person, row) {
+    const item = tasksData[person].find(i => i.row === row);
+    if (!item) return;
+    const task = item.task;
+
     try {
         const res = await fetch('/api/tasks/date/delete', {
             method: 'POST',
@@ -1679,7 +1692,6 @@ async function clearTaskDate(person, row, task) {
         if (!res.ok) throw new Error(data.error || 'Erro ao remover data.');
         
         // Update local memory
-        const item = tasksData[person].find(i => i.row === row);
         if (item) {
             item.date = null;
         }
@@ -1815,7 +1827,7 @@ function renderCalendar() {
                     </span>
                     <span>${t.task}</span>
                 </div>
-                <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row}, \`${t.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Remover data agendada">
+                <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row})" title="Remover data agendada">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             `;
