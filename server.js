@@ -1113,7 +1113,9 @@ app.post('/api/tasks/image/upload', async (req, res) => {
     else if (mimeType === 'image/gif') ext = 'gif';
     else if (mimeType === 'image/webp') ext = 'webp';
     
-    const filename = `${person.toLowerCase()}_${Date.now()}.${ext}`;
+    // Clean name of any characters not safe for filenames (like slashes or spaces)
+    const cleanPerson = person.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const filename = `${cleanPerson}_${Date.now()}.${ext}`;
     const filePath = path.join(__dirname, 'public', 'uploads', filename);
     
     fs.writeFileSync(filePath, buffer);
