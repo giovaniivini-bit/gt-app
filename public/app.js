@@ -503,7 +503,7 @@ let selectedImageMime = null;
 
 // Open Attachments Modal
 function openImageModal(person, row) {
-    const item = tasksData[person].find(i => i.row === row);
+    const item = (tasksData[person] || []).find(i => i.row === row);
     if (!item) return;
     const taskText = item.task;
 
@@ -620,7 +620,7 @@ async function handleImageFileSelected(input) {
             if (!res.ok) throw new Error(data.error || 'Erro ao fazer upload.');
             
             // Update local memory
-            const item = tasksData[person].find(i => i.row === row);
+            const item = (tasksData[person] || []).find(i => i.row === row);
             if (item) {
                 item.attachments = data.attachments;
             }
@@ -636,7 +636,7 @@ async function handleImageFileSelected(input) {
             console.error(err);
             showToast('Erro ao enviar arquivo: ' + err.message, true);
             // Reset add card state
-            const item = tasksData[person].find(i => i.row === row);
+            const item = (tasksData[person] || []).find(i => i.row === row);
             if (item) {
                 renderAttachmentsList(person, row, item.attachments || []);
             }
@@ -666,7 +666,7 @@ async function deleteAttachment(filename) {
         if (!res.ok) throw new Error(data.error || 'Erro ao remover arquivo.');
         
         // Update local memory
-        const item = tasksData[person].find(i => i.row === row);
+        const item = (tasksData[person] || []).find(i => i.row === row);
         if (item) {
             item.attachments = data.attachments;
         }
@@ -686,7 +686,7 @@ async function deleteAttachment(filename) {
 
 // Toggle Task Complete (Optimistic Update)
 async function toggleTask(person, row, checked) {
-    const item = tasksData[person].find(i => i.row === row);
+    const item = (tasksData[person] || []).find(i => i.row === row);
     if (item) {
         item.completed = checked;
         
@@ -760,7 +760,7 @@ function saveObservationDebounced(type, row, text, person, statusId, buttonId) {
             if (!res.ok) throw new Error(data.error || 'Erro ao salvar.');
             
             // Save state locally
-            const item = tasksData[person].find(i => i.row === row);
+            const item = (tasksData[person] || []).find(i => i.row === row);
             if (item) item.observation = text;
             
             // Update button UI dynamically
@@ -1482,7 +1482,7 @@ function startEditTask(person, row) {
 
 // Cancel Inline Edit
 function cancelEditTask(person, row) {
-    const item = tasksData[person].find(t => t.row === row);
+    const item = (tasksData[person] || []).find(t => t.row === row);
     if (item) {
         document.getElementById(`input-${person}-${row}`).value = item.task;
     }
@@ -1517,7 +1517,7 @@ async function saveEditTask(person, row) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao editar tarefa.');
 
-        const item = tasksData[person].find(t => t.row === row);
+        const item = (tasksData[person] || []).find(t => t.row === row);
         if (item) {
             item.task = newText;
         }
@@ -1619,7 +1619,7 @@ async function handleTouchEnd(e) {
 // Open Date Selector Modal
 // Open Date Selector Modal
 function openDateModal(person, row) {
-    const item = tasksData[person].find(i => Number(i.row) === Number(row));
+    const item = (tasksData[person] || []).find(i => Number(i.row) === Number(row));
     if (!item) return;
     const taskText = item.task;
     const currentDate = item.date;
@@ -1682,7 +1682,7 @@ async function saveTaskDate() {
         if (!res.ok) throw new Error(data.error || 'Erro ao agendar data.');
         
         // Update local memory
-        const item = tasksData[person].find(i => i.row === row);
+        const item = (tasksData[person] || []).find(i => i.row === row);
         if (item) {
             item.date = date;
         }
@@ -1714,7 +1714,7 @@ async function deleteTaskDate() {
 
 // Generic function to clear a task's date
 async function clearTaskDate(person, row) {
-    const item = tasksData[person].find(i => i.row === row);
+    const item = (tasksData[person] || []).find(i => i.row === row);
     if (!item) return;
     const task = item.task;
 
