@@ -49,28 +49,50 @@ function getTodayLocalDateString() {
 
 function isOverdue(dateStr, completed) {
     if (completed) return false;
-    const todayStr = getTodayLocalDateString();
-    return dateStr < todayStr;
+    const nowObj = new Date();
+    const year = nowObj.getFullYear();
+    const month = String(nowObj.getMonth() + 1).padStart(2, '0');
+    const day = String(nowObj.getDate()).padStart(2, '0');
+    const hours = String(nowObj.getHours()).padStart(2, '0');
+    const minutes = String(nowObj.getMinutes()).padStart(2, '0');
+    
+    const localNowStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    if (!dateStr.includes('T')) {
+        const todayStr = `${year}-${month}-${day}`;
+        return dateStr < todayStr;
+    }
+    return dateStr < localNowStr;
 }
 
 function formatDateDisplay(dateStr) {
     if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    return `${parts[2]}/${parts[1]}`;
+    const parts = dateStr.split('T');
+    const dateParts = parts[0].split('-');
+    if (dateParts.length !== 3) return dateStr;
+    const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
+    if (parts[1]) {
+        return `${formattedDate} às ${parts[1]}`;
+    }
+    return formattedDate;
 }
 
 function formatFullDateDisplay(dateStr) {
     if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const parts = dateStr.split('T');
+    const dateParts = parts[0].split('-');
+    if (dateParts.length !== 3) return dateStr;
+    const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
     const daysWeek = [
         'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
         'Quinta-feira', 'Sexta-feira', 'Sábado'
     ];
     const dayName = daysWeek[dateObj.getDay()];
-    return `${dayName}, ${parts[2]}/${parts[1]}`;
+    const formattedDate = `${dayName}, ${dateParts[2]}/${dateParts[1]}`;
+    if (parts[1]) {
+        return `${formattedDate} às ${parts[1]}`;
+    }
+    return formattedDate;
 }
 
 // Display Today's Date in Foreground
@@ -1773,16 +1795,19 @@ function renderCalendar() {
         
         tasksData[person].forEach(item => {
             if (item.date) {
-                if (!tasksByDate[item.date]) {
-                    tasksByDate[item.date] = [];
+                // Group by date part only (YYYY-MM-DD)
+                const dayKey = item.date.split('T')[0];
+                if (!tasksByDate[dayKey]) {
+                    tasksByDate[dayKey] = [];
                 }
-                tasksByDate[item.date].push({
+                tasksByDate[dayKey].push({
                     personName: userObj ? userObj.name : person,
                     personKey: person,
                     row: item.row,
                     task: item.task,
                     completed: item.completed,
-                    userColor: userColor
+                    userColor: userColor,
+                    dateTime: item.date
                 });
             }
         });
@@ -1813,18 +1838,23 @@ function renderCalendar() {
         const tasksContainer = document.createElement('div');
         tasksContainer.className = 'calendar-day-tasks';
         
+        // Sort tasks within the same day chronologically by full date/time string
+        tasksByDate[dateStr].sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+        
         tasksByDate[dateStr].forEach(t => {
             const taskItem = document.createElement('div');
             taskItem.className = 'calendar-task-item';
             
-            const isTaskOverdue = isOverdue(dateStr, t.completed);
+            const isTaskOverdue = isOverdue(t.dateTime, t.completed);
+            const timePart = t.dateTime.includes('T') ? t.dateTime.split('T')[1] : '';
+            const timeDisplay = timePart ? ` <span class="cal-task-time" style="opacity: 0.8; font-size: 0.85rem; margin-left: 6px; padding: 1px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-regular fa-clock"></i> ${timePart}</span>` : '';
             
             taskItem.innerHTML = `
                 <div class="calendar-task-info ${t.completed ? 'completed' : ''} ${isTaskOverdue ? 'overdue' : ''}">
                     <span class="calendar-task-owner" style="background: ${t.userColor}20; color: ${t.userColor}; border: 1px solid ${t.userColor}40;">
                         ${t.personName}
                     </span>
-                    <span>${t.task}</span>
+                    <span>${t.task}${timeDisplay}</span>
                 </div>
                 <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row})" title="Remover data agendada">
                     <i class="fa-solid fa-trash-can"></i>

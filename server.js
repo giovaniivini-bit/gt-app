@@ -262,10 +262,23 @@ async function syncCompromissosSheet() {
     const spreadsheetId = await getOrCreateCompromissosSpreadsheet();
     const tasksList = await getActiveTasksWithDates();
     
+    // Sort tasks chronologically by date-time string
+    tasksList.sort((a, b) => a.date.localeCompare(b.date));
+    
     const rows = [['Data', 'Responsável', 'Tarefa', 'Status']];
     tasksList.forEach(t => {
+      let formattedDate = t.date;
+      if (t.date.includes('T')) {
+        const [dPart, tPart] = t.date.split('T');
+        const [yr, mo, dy] = dPart.split('-');
+        formattedDate = `${dy}/${mo}/${yr} ${tPart}`;
+      } else {
+        const [yr, mo, dy] = t.date.split('-');
+        formattedDate = `${dy}/${mo}/${yr}`;
+      }
+
       rows.push([
-        t.date,
+        formattedDate,
         t.personName,
         t.task,
         t.completed ? 'Concluída' : 'Pendente'
@@ -284,7 +297,7 @@ async function syncCompromissosSheet() {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: `Agenda!A1:D${rows.length}`,
-        valueInputOption: 'RAW',
+        valueInputOption: 'USER_ENTERED',
         resource: {
           values: rows
         }
