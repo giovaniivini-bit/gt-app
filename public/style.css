@@ -1812,3 +1812,178 @@ body {
     padding: 12px 14px;
 }
 
+/* Card Date Badge Styles */
+.task-date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    width: fit-content;
+    transition: all 0.2s ease;
+}
+
+.task-date-badge.overdue {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #ef4444 !important;
+    animation: pulseRed 2s infinite;
+}
+
+.task-date-badge.completed-task-date {
+    text-decoration: line-through;
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.04);
+}
+
+.btn-clear-date {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.btn-clear-date:hover {
+    color: #ff5f70;
+}
+
+/* Button style modifications on card actions */
+.btn-card-action.btn-date.has-date {
+    color: #00ff88 !important;
+}
+
+/* Calendar View Tab styles */
+.calendar-view {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.calendar-days-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 40px;
+}
+
+.calendar-day-group {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-day-header {
+    font-family: var(--font-outfit);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.calendar-day-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.calendar-task-item {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.calendar-task-item:hover {
+    transform: translateX(4px);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-task-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-break: break-word;
+    color: var(--text-main);
+}
+
+.calendar-task-info.overdue {
+    color: #ef4444;
+    font-weight: 500;
+}
+
+.calendar-task-info.completed {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.calendar-task-owner {
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.btn-clear-date-cal {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    color: #ff5f70;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-clear-date-cal:hover {
+    background: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+
+@keyframes pulseRed {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+

@@ -67,6 +67,7 @@ function loadUsers() {
 }
 
 const IMAGES_FILE = path.join(__dirname, 'data', 'task_images.json');
+const DATES_FILE = path.join(__dirname, 'data', 'task_dates.json');
 
 // Ensure directory and file exist
 function initImagesStorage() {
@@ -80,6 +81,9 @@ function initImagesStorage() {
   }
   if (!fs.existsSync(IMAGES_FILE)) {
     fs.writeFileSync(IMAGES_FILE, JSON.stringify({}), 'utf8');
+  }
+  if (!fs.existsSync(DATES_FILE)) {
+    fs.writeFileSync(DATES_FILE, JSON.stringify({}), 'utf8');
   }
 }
 
@@ -101,6 +105,27 @@ function saveImagesMap(map) {
     fs.writeFileSync(IMAGES_FILE, JSON.stringify(map, null, 2), 'utf8');
   } catch (e) {
     console.error('Error saving task images:', e);
+  }
+}
+
+function loadDatesMap() {
+  try {
+    initImagesStorage();
+    if (fs.existsSync(DATES_FILE)) {
+      return JSON.parse(fs.readFileSync(DATES_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error loading task dates:', e);
+  }
+  return {};
+}
+
+function saveDatesMap(map) {
+  try {
+    initImagesStorage();
+    fs.writeFileSync(DATES_FILE, JSON.stringify(map, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error saving task dates:', e);
   }
 }
 
@@ -302,6 +327,7 @@ app.get('/api/tasks', async (req, res) => {
       result[u.name.toLowerCase()] = [];
     });
     const imagesMap = loadImagesMap();
+    const datesMap = loadDatesMap();
 
     // Helper to safely extract cell details
     const getCellDetail = (values, relIdx) => {
@@ -382,7 +408,8 @@ app.get('/api/tasks', async (req, res) => {
             observation: obsData.val,
             completed: taskData.strikethrough,
             imageUrl: attachments.length > 0 ? `/uploads/${attachments[0].filename}` : null,
-            attachments: attachments
+            attachments: attachments,
+            date: datesMap[taskKey] || null
           });
         }
       });
@@ -802,17 +829,24 @@ app.post('/api/tasks/edit', async (req, res) => {
       finalTaskText = prefix + finalTaskText;
     }
 
-    // Update imagesMap if the text changed!
+    // Update imagesMap and datesMap if the text changed!
     const cleanNewText = task.trim();
     if (cleanOldText !== cleanNewText) {
-      const imagesMap = loadImagesMap();
       const oldKey = getTaskKey(person, cleanOldText);
       const newKey = getTaskKey(person, cleanNewText);
-      
+
+      const imagesMap = loadImagesMap();
       if (imagesMap[oldKey]) {
         imagesMap[newKey] = imagesMap[oldKey];
         delete imagesMap[oldKey];
         saveImagesMap(imagesMap);
+      }
+
+      const datesMap = loadDatesMap();
+      if (datesMap[oldKey]) {
+        datesMap[newKey] = datesMap[oldKey];
+        delete datesMap[oldKey];
+        saveDatesMap(datesMap);
       }
     }
 
@@ -1227,6 +1261,44 @@ app.post('/api/tasks/image/delete', async (req, res) => {
   } catch (error) {
     console.error('Erro ao deletar imagem:', error);
     res.status(500).json({ error: 'Erro ao deletar imagem: ' + error.message });
+  }
+// Save Task Date Scheduling Endpoint
+app.post('/api/tasks/date/save', async (req, res) => {
+  const { person, task, date } = req.body;
+  if (!person || !task || !date) {
+    return res.status(400).json({ error: 'Responsável, pendência e data são obrigatórios.' });
+  }
+
+  try {
+    const datesMap = loadDatesMap();
+    const taskKey = getTaskKey(person, task);
+    datesMap[taskKey] = date;
+    saveDatesMap(datesMap);
+    res.json({ success: true, date });
+  } catch (error) {
+    console.error('Erro ao agendar data:', error);
+    res.status(500).json({ error: 'Erro ao agendar data: ' + error.message });
+  }
+});
+
+// Delete Task Date Scheduling Endpoint
+app.post('/api/tasks/date/delete', async (req, res) => {
+  const { person, task } = req.body;
+  if (!person || !task) {
+    return res.status(400).json({ error: 'Responsável e pendência são obrigatórios.' });
+  }
+
+  try {
+    const datesMap = loadDatesMap();
+    const taskKey = getTaskKey(person, task);
+    if (datesMap[taskKey]) {
+      delete datesMap[taskKey];
+      saveDatesMap(datesMap);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao remover data agendada:', error);
+    res.status(500).json({ error: 'Erro ao remover data agendada: ' + error.message });
   }
 });
 

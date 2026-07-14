@@ -38,6 +38,41 @@ document.addEventListener('DOMContentLoaded', () => {
     initPolling();
 });
 
+// Date helpers for task scheduling
+function getTodayLocalDateString() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function isOverdue(dateStr, completed) {
+    if (completed) return false;
+    const todayStr = getTodayLocalDateString();
+    return dateStr < todayStr;
+}
+
+function formatDateDisplay(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}/${parts[1]}`;
+}
+
+function formatFullDateDisplay(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const daysWeek = [
+        'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+        'Quinta-feira', 'Sexta-feira', 'Sábado'
+    ];
+    const dayName = daysWeek[dateObj.getDay()];
+    return `${dayName}, ${parts[2]}/${parts[1]}`;
+}
+
 // Display Today's Date in Foreground
 function initDate() {
     const daysWeek = [
@@ -359,6 +394,9 @@ function renderColumnTasks(lowerName, list) {
                     <button class="btn-card-action btn-image ${item.attachments && item.attachments.length > 0 ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Arquivos anexos (Imagens/PDFs)">
                         <i class="fa-solid fa-paperclip"></i>
                     </button>
+                    <button class="btn-card-action btn-date ${item.date ? 'has-date' : ''}" onclick="openDateModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, '${item.date || ''}')" title="Agendar Data">
+                        <i class="fa-regular fa-calendar"></i>
+                    </button>
                     <button id="${buttonId}" class="btn-comment ${hasComment ? 'has-comment' : ''}" onclick="toggleComment('${lowerName}', ${item.row})" title="Observações">
                         <i class="${hasComment ? 'fa-solid fa-comment' : 'fa-regular fa-comment'}"></i>
                     </button>
@@ -378,6 +416,15 @@ function renderColumnTasks(lowerName, list) {
                 <div class="task-content">
                     <div class="task-text-view" id="text-view-${lowerName}-${item.row}">
                         <div class="task-text">${classificationBadge}${item.task}</div>
+                        ${item.date ? `
+                            <div class="task-date-badge ${isOverdue(item.date, item.completed) ? 'overdue' : ''} ${item.completed ? 'completed-task-date' : ''}">
+                                <i class="fa-regular fa-calendar-days"></i>
+                                <span>${formatDateDisplay(item.date)}</span>
+                                <button class="btn-clear-date" onclick="clearTaskDate('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Remover data agendada">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
                     <div class="task-text-edit hidden" id="text-edit-${lowerName}-${item.row}">
                         <textarea class="task-edit-input" id="input-${lowerName}-${item.row}">${item.task}</textarea>
@@ -1024,6 +1071,7 @@ function initPolling() {
                 tasksData = await res.json();
                 renderAllTasks();
                 renderDashboard();
+                renderCalendar();
             }
         } catch (err) {
             console.error('Erro no polling:', err);
@@ -1031,20 +1079,28 @@ function initPolling() {
     }, 10000);
 }
 
-// Switch between dashboard and tasks board views
+// Switch between dashboard, tasks board and calendar views
 function switchView(viewName) {
     currentView = viewName;
     const tasksView = document.getElementById('tasks-view');
     const dashboardView = document.getElementById('dashboard-view');
+    const calendarView = document.getElementById('calendar-view');
     
     if (viewName === 'tasks') {
         tasksView.classList.remove('hidden');
         dashboardView.classList.add('hidden');
+        calendarView.classList.add('hidden');
         renderAllTasks();
-    } else {
+    } else if (viewName === 'dashboard') {
         tasksView.classList.add('hidden');
         dashboardView.classList.remove('hidden');
+        calendarView.classList.add('hidden');
         renderDashboard();
+    } else if (viewName === 'calendar') {
+        tasksView.classList.add('hidden');
+        dashboardView.classList.add('hidden');
+        calendarView.classList.remove('hidden');
+        renderCalendar();
     }
 }
 
@@ -1531,4 +1587,242 @@ async function handleTouchEnd(e) {
     
     touchActiveCard = null;
     touchActivePerson = null;
+}
+
+// Date Scheduling Functions
+
+// Open Date Selector Modal
+function openDateModal(person, row, taskText, currentDate) {
+    document.getElementById('task-date-person').value = person;
+    document.getElementById('task-date-row').value = row;
+    document.getElementById('task-date-text').value = taskText;
+    
+    document.getElementById('task-date-task-desc').textContent = `Tarefa: "${taskText}"`;
+    
+    const dateInput = document.getElementById('task-date-input');
+    dateInput.value = currentDate || '';
+    
+    const deleteBtn = document.getElementById('btn-delete-task-date');
+    if (currentDate) {
+        deleteBtn.classList.remove('hidden');
+    } else {
+        deleteBtn.classList.add('hidden');
+    }
+    
+    openModal('modal-task-date');
+}
+
+// Save Task Date Scheduling
+async function saveTaskDate() {
+    const person = document.getElementById('task-date-person').value;
+    const row = Number(document.getElementById('task-date-row').value);
+    const task = document.getElementById('task-date-text').value;
+    const date = document.getElementById('task-date-input').value;
+    
+    if (!date) {
+        showToast('Selecione uma data válida ou clique em Limpar Data.', true);
+        return;
+    }
+    
+    try {
+        const res = await fetch('/api/tasks/date/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ person, task, date })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao agendar data.');
+        
+        // Update local memory
+        const item = tasksData[person].find(i => i.row === row);
+        if (item) {
+            item.date = date;
+        }
+        
+        // Refresh grid
+        renderColumnTasks(person, tasksData[person]);
+        
+        // Refresh calendar if active
+        if (currentView === 'calendar') {
+            renderCalendar();
+        }
+        
+        showToast('Data agendada com sucesso!');
+        closeModal('modal-task-date');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao agendar data: ' + err.message, true);
+    }
+}
+
+// Clear Task Date Scheduling
+async function deleteTaskDate() {
+    const person = document.getElementById('task-date-person').value;
+    const row = Number(document.getElementById('task-date-row').value);
+    const task = document.getElementById('task-date-text').value;
+    
+    await clearTaskDate(person, row, task);
+    closeModal('modal-task-date');
+}
+
+// Generic function to clear a task's date
+async function clearTaskDate(person, row, task) {
+    try {
+        const res = await fetch('/api/tasks/date/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ person, task })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao remover data.');
+        
+        // Update local memory
+        const item = tasksData[person].find(i => i.row === row);
+        if (item) {
+            item.date = null;
+        }
+        
+        // Refresh grid
+        renderColumnTasks(person, tasksData[person]);
+        
+        // Refresh calendar if active
+        if (currentView === 'calendar') {
+            renderCalendar();
+        }
+        
+        showToast('Data agendada removida!');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao remover data: ' + err.message, true);
+    }
+}
+
+// Clear all scheduled dates for all tasks
+async function clearAllTaskDates() {
+    if (!confirm('Deseja realmente remover e limpar todas as datas agendadas de todas as tarefas?')) return;
+    
+    let clearedCount = 0;
+    const promises = [];
+    
+    for (const person in tasksData) {
+        tasksData[person].forEach(item => {
+            if (item.date) {
+                clearedCount++;
+                promises.push(
+                    fetch('/api/tasks/date/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ person, task: item.task })
+                    }).then(async res => {
+                        if (res.ok) {
+                            item.date = null;
+                        }
+                    })
+                );
+            }
+        });
+    }
+    
+    if (clearedCount === 0) {
+        showToast('Não há nenhuma tarefa agendada para limpar.');
+        return;
+    }
+    
+    try {
+        await Promise.all(promises);
+        
+        // Rerender everything
+        renderAllTasks();
+        if (currentView === 'calendar') {
+            renderCalendar();
+        }
+        
+        showToast(`Limpamos ${clearedCount} data(s) agendada(s) com sucesso!`);
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao limpar datas agendadas: ' + err.message, true);
+    }
+}
+
+// Render dynamic Calendar tab view
+function renderCalendar() {
+    const container = document.getElementById('calendar-days-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Group all active scheduled tasks by date
+    const tasksByDate = {};
+    
+    for (const person in tasksData) {
+        const userObj = users.find(u => u.name.toLowerCase() === person.toLowerCase());
+        const userColor = userObj ? USER_COLORS[users.indexOf(userObj) % USER_COLORS.length] : '#00ff88';
+        
+        tasksData[person].forEach(item => {
+            if (item.date) {
+                if (!tasksByDate[item.date]) {
+                    tasksByDate[item.date] = [];
+                }
+                tasksByDate[item.date].push({
+                    personName: userObj ? userObj.name : person,
+                    personKey: person,
+                    row: item.row,
+                    task: item.task,
+                    completed: item.completed,
+                    userColor: userColor
+                });
+            }
+        });
+    }
+    
+    // Sort dates chronologically
+    const sortedDates = Object.keys(tasksByDate).sort();
+    
+    if (sortedDates.length === 0) {
+        container.innerHTML = `
+            <div class="loader-inner" style="color: var(--text-muted); font-size: 0.95rem; text-align: center; padding: 40px 0;">
+                <i class="fa-regular fa-calendar-xmark" style="font-size: 2rem; margin-bottom: 12px; display: block; opacity: 0.5;"></i>
+                Nenhuma tarefa agendada encontrada.
+            </div>
+        `;
+        return;
+    }
+    
+    sortedDates.forEach(dateStr => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'calendar-day-group';
+        
+        const dayHeader = document.createElement('h3');
+        dayHeader.className = 'calendar-day-header';
+        dayHeader.innerHTML = `<i class="fa-regular fa-calendar-check"></i> ${formatFullDateDisplay(dateStr)}`;
+        groupEl.appendChild(dayHeader);
+        
+        const tasksContainer = document.createElement('div');
+        tasksContainer.className = 'calendar-day-tasks';
+        
+        tasksByDate[dateStr].forEach(t => {
+            const taskItem = document.createElement('div');
+            taskItem.className = 'calendar-task-item';
+            
+            const isTaskOverdue = isOverdue(dateStr, t.completed);
+            
+            taskItem.innerHTML = `
+                <div class="calendar-task-info ${t.completed ? 'completed' : ''} ${isTaskOverdue ? 'overdue' : ''}">
+                    <span class="calendar-task-owner" style="background: ${t.userColor}20; color: ${t.userColor}; border: 1px solid ${t.userColor}40;">
+                        ${t.personName}
+                    </span>
+                    <span>${t.task}</span>
+                </div>
+                <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row}, \`${t.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Remover data agendada">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            `;
+            tasksContainer.appendChild(taskItem);
+        });
+        
+        groupEl.appendChild(tasksContainer);
+        container.appendChild(groupEl);
+    });
 }

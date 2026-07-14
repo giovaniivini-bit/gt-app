@@ -62,6 +62,10 @@
                 <i class="fa-solid fa-chart-pie"></i>
                 <span>Dashboard</span>
             </button>
+            <button class="view-tab-btn" data-view="calendar">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Calendário</span>
+            </button>
             <a href="https://docs.google.com/spreadsheets/d/1aAsiicOY0vu5MgQjeeBCsqcAZwGn3JQmj8drYrVaZtc/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer" class="view-tab-btn shortcut-btn" title="Abrir planilha de Aviamentos">
                 <i class="fa-solid fa-scissors"></i>
                 <span>Aviamentos</span>
@@ -109,6 +113,23 @@
             
             <!-- Users Summary Grid -->
             <div class="dashboard-users-grid" id="dashboard-users-grid">
+                <!-- Dynamically loaded -->
+            </div>
+        </div>
+
+        <!-- View: Calendar -->
+        <div id="calendar-view" class="calendar-view hidden">
+            <section class="controls-panel glass-panel" style="justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-calendar-days" style="color: var(--color-primary); font-size: 1.3rem;"></i>
+                    <h2 style="font-family: var(--font-outfit); font-size: 1.2rem; margin: 0; background: linear-gradient(90deg, #fff 50%, var(--color-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Agenda de Tarefas</h2>
+                </div>
+                <button class="btn btn-secondary" onclick="clearAllTaskDates()" style="background: rgba(220, 53, 69, 0.1); border-color: rgba(220, 53, 69, 0.2); color: #ff5f70; font-weight: 500;" title="Remover e limpar todas as datas agendadas de todas as tarefas">
+                    <i class="fa-solid fa-trash-can"></i> Remover todas as datas agendadas
+                </button>
+            </section>
+            
+            <div id="calendar-days-list" class="calendar-days-list">
                 <!-- Dynamically loaded -->
             </div>
         </div>
@@ -205,6 +226,37 @@
             
             <div class="modal-actions" style="width: 100%; display: flex; justify-content: flex-end; gap: 12px; padding-top: 12px; margin-top: 0;">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modal-task-image')">Fechar</button>
+            </div>
+        </div>
+    <!-- Modal: Schedule Date -->
+    <div id="modal-task-date" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel" style="max-width: 450px; width: 90%;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-calendar-day"></i> Agendar Tarefa</h3>
+                <button class="btn-close-modal" onclick="closeModal('modal-task-date')">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px; padding: 10px 0;">
+                <p id="task-date-task-desc" style="font-size: 0.9rem; color: var(--text-muted); margin: 0; line-height: 1.4; word-break: break-word; font-style: italic;"></p>
+                
+                <div class="form-group">
+                    <label for="task-date-input">Selecione a Data</label>
+                    <input type="date" id="task-date-input" style="width: 100%; color-scheme: dark;">
+                </div>
+                
+                <input type="hidden" id="task-date-person">
+                <input type="hidden" id="task-date-row">
+                <input type="hidden" id="task-date-text">
+            </div>
+            
+            <div class="modal-actions" style="width: 100%; display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; margin-top: 0;">
+                <button type="button" id="btn-delete-task-date" class="btn btn-secondary" onclick="deleteTaskDate()" style="background: rgba(220, 53, 69, 0.1); border-color: rgba(220, 53, 69, 0.2); color: #ff5f70;" title="Remover data agendada">
+                    <i class="fa-solid fa-trash-can"></i> Limpar Data
+                </button>
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-task-date')">Cancelar</button>
+                    <button type="button" class="btn btn-submit" onclick="saveTaskDate()">Salvar Data</button>
+                </div>
             </div>
         </div>
     </div>
