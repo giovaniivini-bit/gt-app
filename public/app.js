@@ -496,7 +496,6 @@ function openImageModal(person, row) {
     document.getElementById('task-image-file-input').value = '';
     
     // Fetch attachments from tasksData memory
-    const item = tasksData[person].find(i => i.row === row);
     const attachments = item ? (item.attachments || []) : [];
     
     renderAttachmentsList(person, row, attachments);
