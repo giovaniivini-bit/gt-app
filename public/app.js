@@ -339,7 +339,7 @@ function filterAndSearch(list) {
 function renderAllTasks() {
     users.forEach(u => {
         const lowerName = u.name.toLowerCase();
-        const list = tasksData[lowerName] || [];
+        const list = tasksData[lowerName.toLowerCase()] || [];
         renderColumnTasks(lowerName, list);
     });
 }
@@ -503,7 +503,7 @@ let selectedImageMime = null;
 
 // Open Attachments Modal
 function openImageModal(person, row) {
-    const item = (tasksData[person] || []).find(i => i.row === row);
+    const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
     if (!item) return;
     const taskText = item.task;
 
@@ -620,7 +620,7 @@ async function handleImageFileSelected(input) {
             if (!res.ok) throw new Error(data.error || 'Erro ao fazer upload.');
             
             // Update local memory
-            const item = (tasksData[person] || []).find(i => i.row === row);
+            const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
             if (item) {
                 item.attachments = data.attachments;
             }
@@ -629,14 +629,14 @@ async function handleImageFileSelected(input) {
             renderAttachmentsList(person, row, data.attachments);
             
             // Refresh the grid card icon state
-            renderColumnTasks(person, tasksData[person]);
+            renderColumnTasks(person, tasksData[person.toLowerCase()]);
             
             showToast('Arquivo enviado com sucesso!');
         } catch (err) {
             console.error(err);
             showToast('Erro ao enviar arquivo: ' + err.message, true);
             // Reset add card state
-            const item = (tasksData[person] || []).find(i => i.row === row);
+            const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
             if (item) {
                 renderAttachmentsList(person, row, item.attachments || []);
             }
@@ -666,7 +666,7 @@ async function deleteAttachment(filename) {
         if (!res.ok) throw new Error(data.error || 'Erro ao remover arquivo.');
         
         // Update local memory
-        const item = (tasksData[person] || []).find(i => i.row === row);
+        const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
         if (item) {
             item.attachments = data.attachments;
         }
@@ -675,7 +675,7 @@ async function deleteAttachment(filename) {
         renderAttachmentsList(person, row, data.attachments);
         
         // Refresh the grid card icon state
-        renderColumnTasks(person, tasksData[person]);
+        renderColumnTasks(person, tasksData[person.toLowerCase()]);
         
         showToast('Arquivo removido com sucesso!');
     } catch (err) {
@@ -686,7 +686,7 @@ async function deleteAttachment(filename) {
 
 // Toggle Task Complete (Optimistic Update)
 async function toggleTask(person, row, checked) {
-    const item = (tasksData[person] || []).find(i => i.row === row);
+    const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
     if (item) {
         item.completed = checked;
         
@@ -701,7 +701,7 @@ async function toggleTask(person, row, checked) {
         }
         
         // Update badge
-        const pendingCount = tasksData[person].filter(i => !i.completed).length;
+        const pendingCount = tasksData[person.toLowerCase()].filter(i => !i.completed).length;
         document.getElementById(`count-${person}`).textContent = pendingCount;
     }
     
@@ -726,7 +726,7 @@ async function toggleTask(person, row, checked) {
         // Rollback
         if (item) {
             item.completed = !checked;
-            renderColumnTasks(person, tasksData[person]);
+            renderColumnTasks(person, tasksData[person.toLowerCase()]);
         }
     }
 }
@@ -760,7 +760,7 @@ function saveObservationDebounced(type, row, text, person, statusId, buttonId) {
             if (!res.ok) throw new Error(data.error || 'Erro ao salvar.');
             
             // Save state locally
-            const item = (tasksData[person] || []).find(i => i.row === row);
+            const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
             if (item) item.observation = text;
             
             // Update button UI dynamically
@@ -1142,7 +1142,7 @@ function renderDashboard() {
 
     users.forEach(u => {
         const lowerName = u.name.toLowerCase();
-        const userList = tasksData[lowerName] || [];
+        const userList = tasksData[lowerName.toLowerCase()] || [];
         
         // Count open tasks (item.completed === false)
         const openTasks = userList.filter(t => !t.completed);
@@ -1333,7 +1333,7 @@ function sendEmailReport(userName) {
     const user = users.find(u => u.name.toLowerCase() === lowerName);
     if (!user) return;
 
-    const userList = tasksData[lowerName] || [];
+    const userList = tasksData[lowerName.toLowerCase()] || [];
     const openTasks = userList.filter(t => !t.completed);
 
     if (openTasks.length === 0) {
@@ -1424,7 +1424,7 @@ async function handleDrop(e) {
 
 // Move task Up or Down via button
 async function moveTaskUpDown(person, row, direction) {
-    const list = tasksData[person];
+    const list = tasksData[person.toLowerCase()];
     const idx = list.findIndex(t => t.row === row);
     if (idx === -1) return;
 
@@ -1453,7 +1453,7 @@ async function moveTaskUpDown(person, row, direction) {
 async function deleteTaskConfirm(person, row) {
     if (!confirm('Deseja realmente excluir esta pendência? Ela será removida da planilha também.')) return;
 
-    const list = tasksData[person];
+    const list = tasksData[person.toLowerCase()];
     const newList = list.filter(t => t.row !== row);
 
     // Optimistically re-render
@@ -1482,7 +1482,7 @@ function startEditTask(person, row) {
 
 // Cancel Inline Edit
 function cancelEditTask(person, row) {
-    const item = (tasksData[person] || []).find(t => t.row === row);
+    const item = (tasksData[person.toLowerCase()] || []).find(t => t.row === row);
     if (item) {
         document.getElementById(`input-${person}-${row}`).value = item.task;
     }
@@ -1517,12 +1517,12 @@ async function saveEditTask(person, row) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Erro ao editar tarefa.');
 
-        const item = (tasksData[person] || []).find(t => t.row === row);
+        const item = (tasksData[person.toLowerCase()] || []).find(t => t.row === row);
         if (item) {
             item.task = newText;
         }
 
-        renderColumnTasks(person, tasksData[person]);
+        renderColumnTasks(person, tasksData[person.toLowerCase()]);
         showToast('Pendência atualizada!');
     } catch (err) {
         console.error(err);
@@ -1619,7 +1619,7 @@ async function handleTouchEnd(e) {
 // Open Date Selector Modal
 // Open Date Selector Modal
 function openDateModal(person, row) {
-    const item = (tasksData[person] || []).find(i => Number(i.row) === Number(row));
+    const item = (tasksData[person.toLowerCase()] || []).find(i => Number(i.row) === Number(row));
     if (!item) return;
     const taskText = item.task;
     const currentDate = item.date;
@@ -1682,13 +1682,13 @@ async function saveTaskDate() {
         if (!res.ok) throw new Error(data.error || 'Erro ao agendar data.');
         
         // Update local memory
-        const item = (tasksData[person] || []).find(i => i.row === row);
+        const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
         if (item) {
             item.date = date;
         }
         
         // Refresh grid
-        renderColumnTasks(person, tasksData[person]);
+        renderColumnTasks(person, tasksData[person.toLowerCase()]);
         
         // Refresh calendar if active
         if (currentView === 'calendar') {
@@ -1714,7 +1714,7 @@ async function deleteTaskDate() {
 
 // Generic function to clear a task's date
 async function clearTaskDate(person, row) {
-    const item = (tasksData[person] || []).find(i => i.row === row);
+    const item = (tasksData[person.toLowerCase()] || []).find(i => i.row === row);
     if (!item) return;
     const task = item.task;
 
@@ -1734,7 +1734,7 @@ async function clearTaskDate(person, row) {
         }
         
         // Refresh grid
-        renderColumnTasks(person, tasksData[person]);
+        renderColumnTasks(person, tasksData[person.toLowerCase()]);
         
         // Refresh calendar if active
         if (currentView === 'calendar') {
@@ -1756,7 +1756,7 @@ async function clearAllTaskDates() {
     const promises = [];
     
     for (const person in tasksData) {
-        tasksData[person].forEach(item => {
+        tasksData[person.toLowerCase()].forEach(item => {
             if (item.date) {
                 clearedCount++;
                 promises.push(
@@ -1809,7 +1809,7 @@ function renderCalendar() {
         const userObj = users.find(u => u.name.toLowerCase() === person.toLowerCase());
         const userColor = userObj ? USER_COLORS[users.indexOf(userObj) % USER_COLORS.length] : '#00ff88';
         
-        tasksData[person].forEach(item => {
+        tasksData[person.toLowerCase()].forEach(item => {
             if (item.date) {
                 // Group by date part only (YYYY-MM-DD)
                 const dayKey = item.date.split('T')[0];
