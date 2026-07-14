@@ -1262,6 +1262,8 @@ app.post('/api/tasks/image/delete', async (req, res) => {
     console.error('Erro ao deletar imagem:', error);
     res.status(500).json({ error: 'Erro ao deletar imagem: ' + error.message });
   }
+});
+
 // Save Task Date Scheduling Endpoint
 app.post('/api/tasks/date/save', async (req, res) => {
   const { person, task, date } = req.body;
