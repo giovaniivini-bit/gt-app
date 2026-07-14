@@ -1617,14 +1617,9 @@ async function handleTouchEnd(e) {
 // Date Scheduling Functions
 
 // Open Date Selector Modal
-// Open Date Selector Modal
 function openDateModal(person, row) {
-    alert('Tentando abrir modal para: ' + person + ' linha: ' + row);
     const item = (tasksData[person.toLowerCase()] || []).find(i => Number(i.row) === Number(row));
-    if (!item) {
-        alert('Falha crítica: Tarefa não encontrada na memória para ' + person + ' na linha ' + row);
-        return;
-    }
+    if (!item) return;
     const taskText = item.task;
     const currentDate = item.date;
 
