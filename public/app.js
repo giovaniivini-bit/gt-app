@@ -356,8 +356,8 @@ function renderColumnTasks(lowerName, list) {
                     <button class="btn-card-action btn-delete-task" onclick="deleteTaskConfirm('${lowerName}', ${item.row})" title="Excluir pendência">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
-                    <button class="btn-card-action btn-image ${item.imageUrl ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, '${item.imageUrl || ''}')" title="Imagem anexa">
-                        <i class="fa-solid fa-image"></i>
+                    <button class="btn-card-action btn-image ${item.attachments && item.attachments.length > 0 ? 'has-image' : ''}" onclick="openImageModal('${lowerName}', ${item.row}, \`${item.task.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" title="Arquivos anexos (Imagens/PDFs)">
+                        <i class="fa-solid fa-paperclip"></i>
                     </button>
                     <button id="${buttonId}" class="btn-comment ${hasComment ? 'has-comment' : ''}" onclick="toggleComment('${lowerName}', ${item.row})" title="Observações">
                         <i class="${hasComment ? 'fa-solid fa-comment' : 'fa-regular fa-comment'}"></i>
@@ -432,44 +432,68 @@ function toggleComment(lowerName, row) {
 let selectedImageBase64 = null;
 let selectedImageMime = null;
 
-// Open Image Modal
-function openImageModal(person, row, taskText, imageUrl) {
+// Open Attachments Modal
+function openImageModal(person, row, taskText) {
     document.getElementById('task-image-person').value = person;
     document.getElementById('task-image-row').value = row;
     document.getElementById('task-image-text').value = taskText;
     
-    selectedImageBase64 = null;
-    selectedImageMime = null;
+    // Set Task description title
+    document.getElementById('task-image-task-desc').textContent = taskText;
     
-    const previewContainer = document.getElementById('task-image-preview-container');
-    const uploadContainer = document.getElementById('task-image-upload-container');
-    const previewImg = document.getElementById('task-image-preview');
-    const deleteBtn = document.getElementById('btn-delete-task-image');
-    const replaceBtn = document.getElementById('btn-replace-task-image');
-    const saveBtn = document.getElementById('btn-save-task-image');
-    const fileInput = document.getElementById('task-image-file-input');
+    // Clear selected file input
+    document.getElementById('task-image-file-input').value = '';
     
-    fileInput.value = ''; // clear previous selection
+    // Fetch attachments from tasksData memory
+    const item = tasksData[person].find(i => i.row === row);
+    const attachments = item ? (item.attachments || []) : [];
     
-    if (imageUrl) {
-        // Task already has an image
-        previewImg.src = imageUrl;
-        previewContainer.classList.remove('hidden');
-        uploadContainer.classList.add('hidden');
-        deleteBtn.classList.remove('hidden');
-        replaceBtn.classList.remove('hidden');
-        saveBtn.classList.add('hidden');
-    } else {
-        // No image yet
-        previewImg.src = '';
-        previewContainer.classList.add('hidden');
-        uploadContainer.classList.remove('hidden');
-        deleteBtn.classList.add('hidden');
-        replaceBtn.classList.add('hidden');
-        saveBtn.classList.add('hidden');
-    }
-    
+    renderAttachmentsList(person, row, attachments);
     openModal('modal-task-image');
+}
+
+// Render dynamic attachments cards list in modal
+function renderAttachmentsList(person, row, attachments) {
+    const container = document.getElementById('attachments-container');
+    container.innerHTML = '';
+    
+    // Render existing attachments
+    attachments.forEach(att => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'attachment-item';
+        
+        let previewHtml = '';
+        if (att.mimeType === 'application/pdf') {
+            previewHtml = `
+                <iframe src="/uploads/${att.filename}#toolbar=0" scrolling="yes"></iframe>
+            `;
+        } else {
+            // Image preview
+            previewHtml = `<img src="/uploads/${att.filename}" alt="${att.originalName}" onclick="window.open('/uploads/${att.filename}', '_blank')">`;
+        }
+        
+        itemEl.innerHTML = `
+            <span class="attachment-name" title="${att.originalName}">${att.originalName}</span>
+            <div class="attachment-preview">
+                ${previewHtml}
+            </div>
+            <button class="btn btn-secondary" onclick="deleteAttachment('${att.filename}')" style="background: rgba(220, 53, 69, 0.1); border-color: rgba(220, 53, 69, 0.2); color: #ff5f70; margin-top: 4px; padding: 4px 8px; font-size: 0.75rem;" title="Remover anexo">
+                <i class="fa-solid fa-trash-can"></i> Remover
+            </button>
+        `;
+        container.appendChild(itemEl);
+    });
+    
+    // Render the Add Attachment Card
+    const addCard = document.createElement('div');
+    addCard.className = 'attachment-upload-zone';
+    addCard.onclick = triggerImageFileInput;
+    addCard.innerHTML = `
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <span>Adicionar Anexo</span>
+        <span style="font-size: 0.7rem; opacity: 0.7; text-align: center; padding: 0 10px;">Formatos: Imagens ou PDFs (Até 15MB)</span>
+    `;
+    container.appendChild(addCard);
 }
 
 // Trigger hidden file input
@@ -477,122 +501,114 @@ function triggerImageFileInput() {
     document.getElementById('task-image-file-input').click();
 }
 
-// Handle local file selection
-function handleImageFileSelected(input) {
+// Handle local file selection and upload instantly
+async function handleImageFileSelected(input) {
     const file = input.files[0];
     if (!file) return;
     
     // Check file size (limit to 15MB)
     if (file.size > 15 * 1024 * 1024) {
-        showToast('A imagem selecionada é muito grande. Limite de 15MB.', true);
+        showToast('O arquivo selecionado é muito grande. Limite de 15MB.', true);
         input.value = '';
         return;
     }
     
-    selectedImageMime = file.type;
+    const person = document.getElementById('task-image-person').value;
+    const row = Number(document.getElementById('task-image-row').value);
+    const task = document.getElementById('task-image-text').value;
+    
+    // Show spinner inside the add button card in modal
+    const addCard = document.querySelector('.attachment-upload-zone');
+    if (addCard) {
+        addCard.innerHTML = `
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: #a855f7;"></i>
+            <span>Enviando arquivo...</span>
+        `;
+        addCard.style.pointerEvents = 'none';
+    }
     
     const reader = new FileReader();
-    reader.onload = function(e) {
-        selectedImageBase64 = e.target.result;
+    reader.onload = async function(e) {
+        const base64Data = e.target.result;
         
-        // Show preview
-        const previewImg = document.getElementById('task-image-preview');
-        previewImg.src = selectedImageBase64;
-        
-        document.getElementById('task-image-preview-container').classList.remove('hidden');
-        document.getElementById('task-image-upload-container').classList.add('hidden');
-        document.getElementById('btn-save-task-image').classList.remove('hidden');
-        document.getElementById('btn-replace-task-image').classList.remove('hidden');
+        try {
+            const res = await fetch('/api/tasks/image/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    person,
+                    task,
+                    imageBase64: base64Data,
+                    mimeType: file.type,
+                    originalName: file.name
+                })
+            });
+            
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao fazer upload.');
+            
+            // Update local memory
+            const item = tasksData[person].find(i => i.row === row);
+            if (item) {
+                item.attachments = data.attachments;
+            }
+            
+            // Refresh modal attachments list
+            renderAttachmentsList(person, row, data.attachments);
+            
+            // Refresh the grid card icon state
+            renderColumnTasks(person, tasksData[person]);
+            
+            showToast('Arquivo enviado com sucesso!');
+        } catch (err) {
+            console.error(err);
+            showToast('Erro ao enviar arquivo: ' + err.message, true);
+            // Reset add card state
+            const item = tasksData[person].find(i => i.row === row);
+            if (item) {
+                renderAttachmentsList(person, row, item.attachments || []);
+            }
+        } finally {
+            input.value = '';
+        }
     };
     reader.readAsDataURL(file);
 }
 
-// Save uploaded image to backend
-async function saveTaskImage() {
-    if (!selectedImageBase64) return;
+// Delete specific attachment file
+async function deleteAttachment(filename) {
+    if (!confirm('Deseja realmente remover este arquivo?')) return;
     
     const person = document.getElementById('task-image-person').value;
     const row = Number(document.getElementById('task-image-row').value);
     const task = document.getElementById('task-image-text').value;
-    
-    const saveBtn = document.getElementById('btn-save-task-image');
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
-    
-    try {
-        const res = await fetch('/api/tasks/image/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                person,
-                task,
-                imageBase64: selectedImageBase64,
-                mimeType: selectedImageMime
-            })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro ao fazer upload.');
-        
-        // Update local state
-        const item = tasksData[person].find(i => i.row === row);
-        if (item) {
-            item.imageUrl = data.imageUrl;
-        }
-        
-        // Rerender column tasks to reflect visual change
-        renderColumnTasks(person, tasksData[person]);
-        
-        showToast('Imagem salva com sucesso!');
-        closeModal('modal-task-image');
-    } catch (err) {
-        console.error(err);
-        showToast('Erro ao salvar imagem: ' + err.message, true);
-    } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Salvar Imagem';
-    }
-}
-
-// Delete image association from backend
-async function deleteTaskImage() {
-    if (!confirm('Deseja realmente remover esta imagem?')) return;
-    
-    const person = document.getElementById('task-image-person').value;
-    const row = Number(document.getElementById('task-image-row').value);
-    const task = document.getElementById('task-image-text').value;
-    
-    const deleteBtn = document.getElementById('btn-delete-task-image');
-    deleteBtn.disabled = true;
-    deleteBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removendo...';
     
     try {
         const res = await fetch('/api/tasks/image/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ person, task })
+            body: JSON.stringify({ person, task, filename })
         });
         
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro ao remover imagem.');
+        if (!res.ok) throw new Error(data.error || 'Erro ao remover arquivo.');
         
-        // Update local state
+        // Update local memory
         const item = tasksData[person].find(i => i.row === row);
         if (item) {
-            item.imageUrl = null;
+            item.attachments = data.attachments;
         }
         
-        // Rerender column tasks to reflect visual change
+        // Refresh modal attachments list
+        renderAttachmentsList(person, row, data.attachments);
+        
+        // Refresh the grid card icon state
         renderColumnTasks(person, tasksData[person]);
         
-        showToast('Imagem removida com sucesso!');
-        closeModal('modal-task-image');
+        showToast('Arquivo removido com sucesso!');
     } catch (err) {
         console.error(err);
-        showToast('Erro ao remover imagem: ' + err.message, true);
-    } finally {
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Excluir';
+        showToast('Erro ao remover arquivo: ' + err.message, true);
     }
 }
 

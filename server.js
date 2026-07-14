@@ -360,7 +360,20 @@ app.get('/api/tasks', async (req, res) => {
           }
 
           const taskKey = getTaskKey(u.name, cleanTask);
-          const imageUrl = imagesMap[taskKey] ? `/uploads/${imagesMap[taskKey]}` : null;
+          
+          // Normalize attachments representation (backward compatibility)
+          let attachments = [];
+          if (imagesMap[taskKey]) {
+            if (Array.isArray(imagesMap[taskKey])) {
+              attachments = imagesMap[taskKey];
+            } else {
+              attachments = [{
+                filename: imagesMap[taskKey],
+                originalName: imagesMap[taskKey],
+                mimeType: imagesMap[taskKey].endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
+              }];
+            }
+          }
 
           result[u.name.toLowerCase()].push({
             row: r_idx + 1,
@@ -368,7 +381,8 @@ app.get('/api/tasks', async (req, res) => {
             classification: classification,
             observation: obsData.val,
             completed: taskData.strikethrough,
-            imageUrl: imageUrl
+            imageUrl: attachments.length > 0 ? `/uploads/${attachments[0].filename}` : null,
+            attachments: attachments
           });
         }
       });
@@ -1096,15 +1110,15 @@ function getLocalIpAddress() {
   return '127.0.0.1';
 }
 
-// Image Upload Endpoint (Receives base64 encoded image)
+// Image/Document Upload Endpoint (Supports multiple attachments)
 app.post('/api/tasks/image/upload', async (req, res) => {
-  const { person, task, imageBase64, mimeType } = req.body;
+  const { person, task, imageBase64, mimeType, originalName } = req.body;
   if (!person || !task || !imageBase64) {
-    return res.status(400).json({ error: 'Responsável, pendência e imagem em Base64 são obrigatórios.' });
+    return res.status(400).json({ error: 'Responsável, pendência e Base64 do arquivo são obrigatórios.' });
   }
 
   try {
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const cleanBase64 = imageBase64.replace(/^data:(image\/\w+|application\/pdf);base64,/, "");
     const buffer = Buffer.from(cleanBase64, 'base64');
     
     // Determine extension from mimeType
@@ -1112,6 +1126,7 @@ app.post('/api/tasks/image/upload', async (req, res) => {
     if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') ext = 'jpg';
     else if (mimeType === 'image/gif') ext = 'gif';
     else if (mimeType === 'image/webp') ext = 'webp';
+    else if (mimeType === 'application/pdf') ext = 'pdf';
     
     // Clean name of any characters not safe for filenames (like slashes or spaces)
     const cleanPerson = person.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
@@ -1124,27 +1139,40 @@ app.post('/api/tasks/image/upload', async (req, res) => {
     const imagesMap = loadImagesMap();
     const taskKey = getTaskKey(person, task);
     
-    // If there was an old image, delete the old file
+    // Normalize current state to an array
+    let currentAttachments = [];
     if (imagesMap[taskKey]) {
-      const oldFilePath = path.join(__dirname, 'public', 'uploads', imagesMap[taskKey]);
-      if (fs.existsSync(oldFilePath)) {
-        try { fs.unlinkSync(oldFilePath); } catch (e) {}
+      if (Array.isArray(imagesMap[taskKey])) {
+        currentAttachments = imagesMap[taskKey];
+      } else {
+        currentAttachments = [{
+          filename: imagesMap[taskKey],
+          originalName: imagesMap[taskKey],
+          mimeType: imagesMap[taskKey].endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
+        }];
       }
     }
     
-    imagesMap[taskKey] = filename;
+    const newAttachment = {
+      filename: filename,
+      originalName: originalName || filename,
+      mimeType: mimeType || (mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg')
+    };
+    
+    currentAttachments.push(newAttachment);
+    imagesMap[taskKey] = currentAttachments;
     saveImagesMap(imagesMap);
     
-    res.json({ success: true, imageUrl: `/uploads/${filename}` });
+    res.json({ success: true, attachments: currentAttachments });
   } catch (error) {
-    console.error('Erro ao fazer upload da imagem:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload da imagem: ' + error.message });
+    console.error('Erro ao fazer upload da imagem/documento:', error);
+    res.status(500).json({ error: 'Erro ao fazer upload da imagem/documento: ' + error.message });
   }
 });
 
-// Image Delete Endpoint
+// Image/Document Delete Endpoint (Supports deleting specific attachment)
 app.post('/api/tasks/image/delete', async (req, res) => {
-  const { person, task } = req.body;
+  const { person, task, filename } = req.body;
   if (!person || !task) {
     return res.status(400).json({ error: 'Responsável e pendência são obrigatórios.' });
   }
@@ -1153,16 +1181,49 @@ app.post('/api/tasks/image/delete', async (req, res) => {
     const imagesMap = loadImagesMap();
     const taskKey = getTaskKey(person, task);
     
+    let currentAttachments = [];
     if (imagesMap[taskKey]) {
-      const filePath = path.join(__dirname, 'public', 'uploads', imagesMap[taskKey]);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch (e) {}
+      if (Array.isArray(imagesMap[taskKey])) {
+        currentAttachments = imagesMap[taskKey];
+      } else {
+        currentAttachments = [{
+          filename: imagesMap[taskKey],
+          originalName: imagesMap[taskKey],
+          mimeType: imagesMap[taskKey].endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'
+        }];
       }
-      delete imagesMap[taskKey];
-      saveImagesMap(imagesMap);
     }
     
-    res.json({ success: true });
+    if (filename) {
+      // Find the specific attachment to delete
+      const targetIdx = currentAttachments.findIndex(att => att.filename === filename);
+      if (targetIdx !== -1) {
+        const targetFilename = currentAttachments[targetIdx].filename;
+        const filePath = path.join(__dirname, 'public', 'uploads', targetFilename);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) {}
+        }
+        currentAttachments.splice(targetIdx, 1);
+      }
+    } else {
+      // If no specific filename, delete all files of this task
+      currentAttachments.forEach(att => {
+        const filePath = path.join(__dirname, 'public', 'uploads', att.filename);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) {}
+        }
+      });
+      currentAttachments = [];
+    }
+    
+    if (currentAttachments.length > 0) {
+      imagesMap[taskKey] = currentAttachments;
+    } else {
+      delete imagesMap[taskKey];
+    }
+    
+    saveImagesMap(imagesMap);
+    res.json({ success: true, attachments: currentAttachments });
   } catch (error) {
     console.error('Erro ao deletar imagem:', error);
     res.status(500).json({ error: 'Erro ao deletar imagem: ' + error.message });
