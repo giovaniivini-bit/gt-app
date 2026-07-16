@@ -1596,9 +1596,11 @@ async function processFutureTasks() {
       spreadsheetId: TASKS_SPREADSHEET_ID,
       range: "'TAREFAS FUTURAS'!B2:G"
     });
-    
     const rows = response.data.values || [];
-    const now = new Date(); // Local VPS time
+    
+    // Calcula o horário atual no fuso do Brasil
+    const nowStr = new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"});
+    const now = new Date(nowStr);
     
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
