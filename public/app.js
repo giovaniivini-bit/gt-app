@@ -1013,6 +1013,66 @@ function closeModal(id) {
     document.getElementById(id).classList.add('hidden');
 }
 
+// Tarefas Futuras
+async function openTarefasFuturasModal() {
+    const listContainer = document.getElementById('tarefas-futuras-list');
+    listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Carregando...</div>';
+    openModal('modal-tarefas-futuras');
+    
+    try {
+        const res = await fetch('/api/tarefas-futuras');
+        if (!res.ok) throw new Error('Falha ao carregar fila.');
+        const pending = await res.json();
+        
+        if (pending.length === 0) {
+            listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma tarefa na fila de espera.</div>';
+            return;
+        }
+        
+        // Sort by date and time
+        pending.sort((a, b) => {
+            const dateTimeA = parseDateForSort(a.date, a.time);
+            const dateTimeB = parseDateForSort(b.date, b.time);
+            return dateTimeA.localeCompare(dateTimeB);
+        });
+        
+        listContainer.innerHTML = '';
+        pending.forEach(t => {
+            const isUrgenteHTML = t.urgente ? '<span style="color: #ff455b; font-weight: bold; margin-left: 6px;">[URGENTE]</span>' : '';
+            const border = t.urgente ? 'border-left: 3px solid #ff455b;' : 'border-left: 3px solid rgba(var(--color-primary-rgb), 0.5);';
+            listContainer.innerHTML += `
+                <div style="background: rgba(0,0,0,0.15); padding: 10px 14px; border-radius: 6px; margin-bottom: 6px; ${border}">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem; color: #aaa;">
+                        <span><i class="fa-solid fa-circle-user"></i> ${t.user}</span>
+                        <span><i class="fa-regular fa-clock"></i> ${t.date} às ${t.time}</span>
+                    </div>
+                    <div style="font-size: 1rem; color: #fff;">
+                        ${t.task} ${isUrgenteHTML}
+                    </div>
+                </div>
+            `;
+        });
+    } catch (err) {
+        listContainer.innerHTML = `<div style="text-align: center; color: #ff455b; padding: 20px;">${err.message}</div>`;
+    }
+}
+
+function parseDateForSort(dateStr, timeStr) {
+    let iso = '9999-12-31';
+    if (dateStr && dateStr.includes('/')) {
+        const p = dateStr.split('/');
+        if (p.length === 3) {
+            let y = p[2].trim();
+            if (y.length === 2) y = '20' + y;
+            const m = p[1].trim().padStart(2, '0');
+            const d = p[0].trim().padStart(2, '0');
+            iso = `${y}-${m}-${d}`;
+        }
+    }
+    const t = (timeStr || '00:00').trim().padStart(5, '0');
+    return `${iso}T${t}`;
+}
+
 // Toast Alert System
 function showToast(message, isError = false) {
     const toast = document.getElementById('toast');

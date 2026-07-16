@@ -681,11 +681,25 @@ app.post('/api/tasks/add', async (req, res) => {
   }
 
   try {
+    const result = await addTaskToSheet(person, task, observation, classification);
+    res.json({
+      success: true,
+      task: result
+    });
+  } catch (error) {
+    console.error('Erro ao adicionar tarefa no topo:', error);
+    res.status(500).json({ error: 'Erro ao salvar nova pendência no topo: ' + error.message });
+  }
+});
+
+async function addTaskToSheet(person, task, observation, classification) {
+
+  try {
     const users = loadUsers();
     const user = users.find(u => u.name.toLowerCase() === person.toLowerCase());
     
     if (!user) {
-      return res.status(400).json({ error: `Usuário '${person}' não cadastrado.` });
+      throw new Error(`Usuário '${person}' não cadastrado.`);
     }
 
     const auth = getOAuth2Client();
@@ -831,22 +845,18 @@ app.post('/api/tasks/add', async (req, res) => {
 
     await sheets.spreadsheets.batchUpdate(updateRequest);
 
-    res.json({
-      success: true,
-      task: {
-        row: 4 + insertIndex,
-        task,
-        classification: classification || '',
-        observation: observation || '',
-        completed: false
-      }
-    });
-
+    return {
+      row: 4 + insertIndex,
+      task,
+      classification: classification || '',
+      observation: observation || '',
+      completed: false
+    };
   } catch (error) {
-    console.error('Erro ao adicionar tarefa no topo:', error);
-    res.status(500).json({ error: 'Erro ao salvar nova pendência no topo: ' + error.message });
+    console.error('Erro no addTaskToSheet:', error);
+    throw error;
   }
-});
+}
 
 // Classify Task (read current value from sheet, parse, apply prefix, and save)
 app.post('/api/tasks/classify', async (req, res) => {
@@ -1572,6 +1582,124 @@ app.post('/api/tasks/date/delete', async (req, res) => {
   } catch (error) {
     console.error('Erro ao remover data agendada:', error);
     res.status(500).json({ error: 'Erro ao remover data agendada: ' + error.message });
+  }
+});
+
+// Process Tarefas Futuras
+async function processFutureTasks() {
+  try {
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    // Read TAREFAS FUTURAS!B2:G
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      range: "'TAREFAS FUTURAS'!B2:G"
+    });
+    
+    const rows = response.data.values || [];
+    const now = new Date(); // Local VPS time
+    
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      // B=0(USER), C=1(TASK), D=2(DATE), E=3(TIME), F=4(URGENT), G=5(STATUS)
+      const user = row[0] || '';
+      const taskText = row[1] || '';
+      const dateStr = row[2] || '';
+      const timeStr = row[3] || '07:00:00';
+      const urgentStr = row[4] || '';
+      const status = row[5] || '';
+      
+      if (!user || !taskText || !dateStr || status === 'ENVIADO') continue;
+      
+      // dateStr usually is DD/MM/YYYY
+      let isoDateStr = '';
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          let y = parts[2].trim();
+          if (y.length === 2) y = '20' + y;
+          const m = parts[1].trim().padStart(2, '0');
+          const d = parts[0].trim().padStart(2, '0');
+          // timeStr is HH:MM:SS or HH:MM
+          let t = timeStr.trim();
+          if (t.length <= 5) t += ':00'; 
+          isoDateStr = `${y}-${m}-${d}T${t}`;
+        }
+      } else {
+        continue;
+      }
+      
+      const taskTime = new Date(isoDateStr);
+      
+      // If task time is valid and has passed or is now
+      if (!isNaN(taskTime.getTime()) && taskTime <= now) {
+        const classification = urgentStr.toUpperCase() === 'SIM' ? 'urgente' : '';
+        
+        try {
+          await addTaskToSheet(user, taskText, '', classification);
+          
+          // Mark as ENVIADO
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: TASKS_SPREADSHEET_ID,
+            range: `'TAREFAS FUTURAS'!G${i + 2}`,
+            valueInputOption: "RAW",
+            resource: {
+              values: [['ENVIADO']]
+            }
+          });
+          console.log(`Tarefa Futura "${taskText}" processada para ${user}.`);
+        } catch (e) {
+          console.error(`Falha ao enviar tarefa futura para ${user}:`, e.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao processar tarefas futuras:', err);
+  }
+}
+
+// Run every 1 minute
+setInterval(processFutureTasks, 60000);
+
+// Endpoint for frontend to see pending future tasks
+app.get('/api/tarefas-futuras', async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: TASKS_SPREADSHEET_ID,
+      range: "'TAREFAS FUTURAS'!B2:G"
+    });
+    
+    const rows = response.data.values || [];
+    const pending = [];
+    
+    rows.forEach((row, idx) => {
+      const user = row[0] || '';
+      const taskText = row[1] || '';
+      const dateStr = row[2] || '';
+      const timeStr = row[3] || '';
+      const urgentStr = row[4] || '';
+      const status = row[5] || '';
+      
+      if (!user || !taskText || !dateStr || status === 'ENVIADO') return;
+      
+      pending.push({
+        row: idx + 2,
+        user,
+        task: taskText,
+        date: dateStr,
+        time: timeStr,
+        urgente: urgentStr.toUpperCase() === 'SIM'
+      });
+    });
+    
+    res.json(pending);
+  } catch (error) {
+    console.error('Erro ao buscar tarefas futuras:', error);
+    res.status(500).json({ error: 'Erro ao buscar tarefas futuras: ' + error.message });
   }
 });
 

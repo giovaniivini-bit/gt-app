@@ -35,6 +35,9 @@
             </div>
             
             <div class="header-actions">
+                <button id="btn-tarefas-futuras" class="btn btn-secondary" title="Fila de Tarefas Futuras" onclick="openTarefasFuturasModal()" style="opacity: 0.6; font-size: 0.8rem; padding: 4px 8px; min-width: auto;">
+                    TF
+                </button>
                 <button id="btn-mobile-link" class="btn btn-secondary mobile-access-btn" title="Acessar no celular">
                     <i class="fa-solid fa-mobile-screen-button"></i>
                     <span>Celular</span>
@@ -268,6 +271,27 @@
         </div>
     </div>
 
-    <script src="app.js?v=10"></script>
+    <!-- Modal: Tarefas Futuras -->
+    <div id="modal-tarefas-futuras" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel" style="max-width: 600px; width: 90%;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Tarefas Futuras (Na Fila)</h3>
+                <button class="btn-close-modal" onclick="closeModal('modal-tarefas-futuras')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 10px 0;">
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+                    Estas tarefas estão agendadas na planilha e entrarão automaticamente no sistema apenas quando chegar o horário programado.
+                </p>
+                <div id="tarefas-futuras-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-muted); padding: 20px;">Carregando...</div>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-tarefas-futuras')">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=11"></script>
 </body>
 </html>
