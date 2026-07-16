@@ -644,7 +644,7 @@ app.get('/api/aviamentos', async (req, res) => {
           let d = parts[0].trim().padStart(2, '0');
           // Handle short year like '26' instead of '2026' if needed, though they seem to use 4 digits
           if (y.length === 2) y = '20' + y;
-          isoDate = `${y}-${m}-${d}T12:00`;
+          isoDate = `${y}-${m}-${d}T07:00`;
         }
       }
       

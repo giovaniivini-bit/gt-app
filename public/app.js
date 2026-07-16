@@ -1908,12 +1908,16 @@ function renderCalendar() {
             
             if (t.isAviamento) {
                 // Specific styling for Aviamentos (External Events)
+                const avBorder = isTaskOverdue ? '#ff455b' : '#ffcc00';
+                const avBg = isTaskOverdue ? 'rgba(255, 69, 91, 0.05)' : 'rgba(255, 204, 0, 0.05)';
+                const avBgSpan = isTaskOverdue ? '#ff455b20' : '#ffcc0020';
+                
                 taskItem.innerHTML = `
-                    <div class="calendar-task-time" style="color: #bbb;">
+                    <div class="calendar-task-time" style="color: ${isTaskOverdue ? '#ff455b' : '#bbb'};">
                         ${formatDateDisplay(t.dateTime).split(' às ')[1] || 'O Dia Todo'}
                     </div>
-                    <div class="calendar-task-info" style="border-left: 3px solid #ffcc00; padding-left: 10px; background: rgba(255, 204, 0, 0.05); border-radius: 4px;">
-                        <span class="calendar-task-owner" style="background: #ffcc0020; color: #ffcc00; border: 1px solid #ffcc0040;">
+                    <div class="calendar-task-info" style="border-left: 3px solid ${avBorder}; padding-left: 10px; background: ${avBg}; border-radius: 4px;">
+                        <span class="calendar-task-owner" style="background: ${avBgSpan}; color: ${avBorder}; border: 1px solid ${avBorder}40;">
                             ${t.personName || 'Indefinido'}
                         </span>
                         <p class="calendar-task-text" style="color: #f1f1f1;">
@@ -1935,7 +1939,10 @@ function renderCalendar() {
                             ${t.task}
                         </p>
                     </div>
-                    <div class="calendar-task-actions">
+                    <div class="calendar-task-actions" style="display: flex; gap: 8px;">
+                        <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row})" title="Remover data agendada" style="background: transparent; color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                         <button class="btn-action ${t.completed ? 'btn-uncomplete' : 'btn-complete'}" onclick="toggleTaskCompletion('${t.personKey}', ${t.row})">
                             <i class="fa-solid ${t.completed ? 'fa-rotate-left' : 'fa-check'}"></i>
                         </button>
