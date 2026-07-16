@@ -602,6 +602,78 @@ app.get('/api/tasks', async (req, res) => {
     res.status(500).json({ error: 'Erro ao obter tarefas da planilha: ' + error.message });
   }
 });
+
+// Fetch Aviamentos from external spreadsheet
+app.get('/api/aviamentos', async (req, res) => {
+  try {
+    const auth = getOAuth2Client();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const spreadsheetId = '1aAsiicOY0vu5MgQjeeBCsqcAZwGn3JQmj8drYrVaZtc';
+    
+    // Get spreadsheet info to find the exact sheet title using GID
+    const info = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheet = info.data.sheets.find(s => s.properties.sheetId === 558981201);
+    
+    if (!sheet) {
+      return res.json([]);
+    }
+    
+    const title = sheet.properties.title;
+    
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `'${title}'!H2:L1000`
+    });
+    
+    const rows = response.data.values || [];
+    const aviamentos = [];
+    
+    rows.forEach(row => {
+      // H=0 (Previsao), I=1 (Resp), J=2 (Forn), K=3 (Prod), L=4 (Desc)
+      const dateRaw = row[0] || '';
+      if (!dateRaw || dateRaw === '-' || dateRaw.trim() === '') return;
+      
+      // Parse DD/MM/YYYY into YYYY-MM-DD
+      let isoDate = dateRaw;
+      if (dateRaw.includes('/')) {
+        const parts = dateRaw.split('/');
+        if (parts.length === 3) {
+          let y = parts[2].trim();
+          let m = parts[1].trim().padStart(2, '0');
+          let d = parts[0].trim().padStart(2, '0');
+          // Handle short year like '26' instead of '2026' if needed, though they seem to use 4 digits
+          if (y.length === 2) y = '20' + y;
+          isoDate = `${y}-${m}-${d}T12:00`;
+        }
+      }
+      
+      const resp = row[1] || '';
+      const forn = row[2] || '';
+      const prod = row[3] || '';
+      const desc = row[4] || '';
+      
+      let titleText = `📦 Aviamento: ${desc}`;
+      if (prod) titleText += ` (${prod})`;
+      if (forn) titleText += ` - Forn: ${forn}`;
+      
+      aviamentos.push({
+        type: 'aviamento',
+        date: isoDate,
+        personName: resp,
+        task: titleText,
+        supplier: forn,
+        product: prod,
+        description: desc
+      });
+    });
+    
+    res.json(aviamentos);
+  } catch (error) {
+    console.error('Erro ao buscar aviamentos:', error);
+    res.status(500).json({ error: 'Erro ao obter aviamentos: ' + error.message });
+  }
+});
 app.post('/api/tasks/add', async (req, res) => {
   const { person, task, observation, classification } = req.body;
   if (!person || !task) {

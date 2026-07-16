@@ -3,6 +3,7 @@
 // State
 let users = [];
 let tasksData = {};
+let aviamentosData = [];
 let collapsedColumns = {}; // userName (lowercase) -> boolean (true if collapsed, false if expanded)
 let currentFilter = 'all';
 let searchQuery = '';
@@ -221,8 +222,9 @@ async function fetchUsers() {
         // Re-create columns grid skeleton
         renderColumnsSkeleton();
         
-        // Fetch Tasks
+        // Fetch Tasks and Aviamentos
         await fetchTasks();
+        await fetchAviamentos();
     } catch (err) {
         console.error(err);
         showToast('Erro ao carregar responsáveis: ' + err.message, true);
@@ -289,6 +291,18 @@ async function fetchTasks() {
     } catch (err) {
         console.error(err);
         showToast('Erro ao carregar tarefas: ' + err.message, true);
+    }
+}
+
+// Fetch Aviamentos from API
+async function fetchAviamentos() {
+    try {
+        const res = await fetch('/api/aviamentos');
+        if (res.ok) {
+            aviamentosData = await res.json();
+        }
+    } catch (err) {
+        console.error('Erro ao buscar aviamentos:', err);
     }
 }
 
@@ -1094,12 +1108,18 @@ function initPolling() {
             const res = await fetch('/api/tasks');
             if (res.ok) {
                 tasksData = await res.json();
-                renderAllTasks();
-                renderDashboard();
-                renderCalendar();
             }
+            
+            const resAv = await fetch('/api/aviamentos');
+            if (resAv.ok) {
+                aviamentosData = await resAv.json();
+            }
+            
+            renderAllTasks();
+            renderDashboard();
+            renderCalendar();
         } catch (err) {
-            console.error('Erro no polling:', err);
+            console.error('Erro de sincronização (polling):', err);
         }
     }, 10000);
 }
@@ -1828,6 +1848,30 @@ function renderCalendar() {
         });
     }
     
+    // Inject Aviamentos data into the same tasksByDate structure
+    if (aviamentosData && aviamentosData.length > 0) {
+        aviamentosData.forEach(item => {
+            if (item.date) {
+                const dayKey = item.date.split('T')[0];
+                if (!tasksByDate[dayKey]) {
+                    tasksByDate[dayKey] = [];
+                }
+                
+                // Try to map a user color if the name matches
+                const userObj = users.find(u => u.name.toLowerCase() === item.personName.toLowerCase());
+                const userColor = userObj ? USER_COLORS[users.indexOf(userObj) % USER_COLORS.length] : '#888888';
+                
+                tasksByDate[dayKey].push({
+                    isAviamento: true,
+                    personName: item.personName,
+                    task: item.task,
+                    userColor: userColor,
+                    dateTime: item.date
+                });
+            }
+        });
+    }
+    
     // Sort dates chronologically
     const sortedDates = Object.keys(tasksByDate).sort();
     
@@ -1857,24 +1901,47 @@ function renderCalendar() {
         tasksByDate[dateStr].sort((a, b) => a.dateTime.localeCompare(b.dateTime));
         
         tasksByDate[dateStr].forEach(t => {
+            const isTaskOverdue = isOverdue(t.dateTime, t.completed);
+            
             const taskItem = document.createElement('div');
             taskItem.className = 'calendar-task-item';
             
-            const isTaskOverdue = isOverdue(t.dateTime, t.completed);
-            const timePart = t.dateTime.includes('T') ? t.dateTime.split('T')[1] : '';
-            const timeDisplay = timePart ? ` <span class="cal-task-time" style="opacity: 0.8; font-size: 0.85rem; margin-left: 6px; padding: 1px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-regular fa-clock"></i> ${timePart}</span>` : '';
-            
-            taskItem.innerHTML = `
-                <div class="calendar-task-info ${t.completed ? 'completed' : ''} ${isTaskOverdue ? 'overdue' : ''}">
-                    <span class="calendar-task-owner" style="background: ${t.userColor}20; color: ${t.userColor}; border: 1px solid ${t.userColor}40;">
-                        ${t.personName}
-                    </span>
-                    <span>${t.task}${timeDisplay}</span>
-                </div>
-                <button class="btn-clear-date-cal" onclick="clearTaskDate('${t.personKey}', ${t.row})" title="Remover data agendada">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            `;
+            if (t.isAviamento) {
+                // Specific styling for Aviamentos (External Events)
+                taskItem.innerHTML = `
+                    <div class="calendar-task-time" style="color: #bbb;">
+                        ${formatDateDisplay(t.dateTime).split(' às ')[1] || 'O Dia Todo'}
+                    </div>
+                    <div class="calendar-task-info" style="border-left: 3px solid #ffcc00; padding-left: 10px; background: rgba(255, 204, 0, 0.05); border-radius: 4px;">
+                        <span class="calendar-task-owner" style="background: #ffcc0020; color: #ffcc00; border: 1px solid #ffcc0040;">
+                            ${t.personName || 'Indefinido'}
+                        </span>
+                        <p class="calendar-task-text" style="color: #f1f1f1;">
+                            ${t.task}
+                        </p>
+                    </div>
+                `;
+            } else {
+                // Normal Task Item
+                taskItem.innerHTML = `
+                    <div class="calendar-task-time ${t.completed ? 'completed' : ''} ${isTaskOverdue ? 'overdue' : ''}">
+                        ${formatDateDisplay(t.dateTime).split(' às ')[1] || 'O Dia Todo'}
+                    </div>
+                    <div class="calendar-task-info ${t.completed ? 'completed' : ''} ${isTaskOverdue ? 'overdue' : ''}">
+                        <span class="calendar-task-owner" style="background: ${t.userColor}20; color: ${t.userColor}; border: 1px solid ${t.userColor}40;">
+                            ${t.personName}
+                        </span>
+                        <p class="calendar-task-text">
+                            ${t.task}
+                        </p>
+                    </div>
+                    <div class="calendar-task-actions">
+                        <button class="btn-action ${t.completed ? 'btn-uncomplete' : 'btn-complete'}" onclick="toggleTaskCompletion('${t.personKey}', ${t.row})">
+                            <i class="fa-solid ${t.completed ? 'fa-rotate-left' : 'fa-check'}"></i>
+                        </button>
+                    </div>
+                `;
+            }
             tasksContainer.appendChild(taskItem);
         });
         
