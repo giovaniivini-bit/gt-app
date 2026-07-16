@@ -1597,10 +1597,7 @@ async function processFutureTasks() {
       range: "'TAREFAS FUTURAS'!B2:G"
     });
     const rows = response.data.values || [];
-    
-    // Calcula o horário atual no fuso do Brasil
-    const nowStr = new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"});
-    const now = new Date(nowStr);
+    const now = new Date(); // Global current time
     
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -1626,7 +1623,7 @@ async function processFutureTasks() {
           // timeStr is HH:MM:SS or HH:MM
           let t = timeStr.trim();
           if (t.length <= 5) t += ':00'; 
-          isoDateStr = `${y}-${m}-${d}T${t}`;
+          isoDateStr = `${y}-${m}-${d}T${t}-03:00`;
         }
       } else {
         continue;
