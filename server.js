@@ -623,15 +623,20 @@ app.get('/api/aviamentos', async (req, res) => {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `'${title}'!H2:L1000`
+      range: `'${title}'!H2:M1000`
     });
     
     const rows = response.data.values || [];
     const aviamentos = [];
     
     rows.forEach(row => {
-      // H=0 (Previsao), I=1 (Resp), J=2 (Forn), K=3 (Prod), L=4 (Desc)
+      // H=0 (Previsao), I=1 (Resp), J=2 (Forn), K=3 (Prod), L=4 (Desc), M=5 (Recebido)
       const dateRaw = row[0] || '';
+      const recebido = row[5] || '';
+      
+      // Se a coluna Recebido não estiver vazia, significa que já chegou, então ignora da agenda
+      if (recebido.trim() !== '') return;
+      
       if (!dateRaw || dateRaw === '-' || dateRaw.trim() === '') return;
       
       // Parse DD/MM/YYYY into YYYY-MM-DD
